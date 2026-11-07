@@ -95,7 +95,7 @@ describe("NotificationsModal", () => {
     fireEvent.click(await screen.findByText("Ship it"));
     expect(markNotificationRead).toHaveBeenCalledWith("2");
     await waitFor(() => expect(client.getQueryData(qk.unreadCount)).toBe(0));
-    expect(mockNavigate).toHaveBeenCalledWith("/task-page?id=t1");
+    expect(mockNavigate).toHaveBeenCalledWith("/project-page?id=p1&task=t1"); // opens the task in its project's drawer
     expect(setOpen).toHaveBeenCalledWith(false);
   });
 

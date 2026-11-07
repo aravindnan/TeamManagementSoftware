@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Link } from "react-router-dom";
+import TaskLink from "./TaskLink";
 import moment from "moment";
 import { barGeometry, linePoints, niceMax } from "../helper/charts";
 
@@ -155,7 +155,7 @@ function InsightsPanel({ data, error, project, onRetry }: Props) {
               const slow = cycleTime.p85 !== null && t.daysInColumn > cycleTime.p85;
               return (
                 <li key={t.taskId} className="flex flex-row flex-wrap items-center gap-2 bg-white rounded-[6px] px-2 py-1 shadow-sm text-[12px]">
-                  <Link to={`/task-page?id=${t.taskId}`} className="font-semibold text-C11 hover:underline underline-offset-2">{t.taskTitle}</Link>
+                  <TaskLink taskId={t.taskId} className="font-semibold text-C11 hover:underline underline-offset-2">{t.taskTitle}</TaskLink>
                   <span className="text-[10px] text-gray-500">{`${t.taskStatus} · ${names.get(t.assignedTo) || "Unassigned"}`}</span>
                   <span className="ml-auto text-[10px] font-semibold text-C11">{`${t.daysInColumn}d in column · ${t.ageDays}d old`}</span>
                   {slow && <span className="text-[9px] font-bold rounded-[4px] bg-mediumPriority text-C11 px-[6px] py-[1px]">Slower than 85% of finished tasks</span>}

@@ -32,7 +32,7 @@ export const getProjectRisk = (projectId: string) => call(api.get(`/get-project-
 
 export type ActivityCategory = "project" | "task" | "comment" | "file" | "member";
 
-export const getProjectActivity = (projectId: string, params: { before?: string; category?: ActivityCategory; limit?: number } = {}) =>
+export const getProjectActivity = (projectId: string, params: { before?: string; category?: ActivityCategory; limit?: number; task?: string } = {}) =>
   call(api.get(`/get-project-activity-by-id/${projectId}`, { params }));
 
 export const getProjectAnalytics = (projectId: string) => call(api.get(`/get-project-analytics-by-id/${projectId}`));

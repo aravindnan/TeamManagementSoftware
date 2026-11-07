@@ -22,7 +22,9 @@ export interface NotificationText {
 }
 
 const quote = (s: any) => `“${s}”`;
-const taskLink = (n: NotificationItem) => (n.task ? `/task-page?id=${n.task}` : undefined);
+// Opens the task in its project's drawer when we know the project, otherwise on the task's own page.
+const taskLink = (n: NotificationItem) =>
+  n.task ? (n.project ? `/project-page?id=${n.project}&task=${n.task}` : `/task-page?id=${n.task}`) : undefined;
 
 /** Phrases an event from the *recipient's* point of view ("assigned you ..."). */
 export function describeNotification(n: NotificationItem): NotificationText {
@@ -41,6 +43,8 @@ export function describeNotification(n: NotificationItem): NotificationText {
       return { lead: "updated", subject: d.title, to: taskLink(n), detail: (d.changes || []).map((c: any) => c.field).join(", ") || undefined };
     case "comment.task":
       return { lead: "commented on", subject: d.title, to: taskLink(n), detail: quote(d.excerpt) };
+    case "task.reassigned":
+      return { lead: "reassigned", subject: d.title, trail: `from ${d.from} to ${d.to}`, to: taskLink(n) };
     case "task.deleted":
       return { lead: "deleted task", subject: d.title };
     case "member.added":

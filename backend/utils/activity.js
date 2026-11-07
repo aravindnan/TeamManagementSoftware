@@ -11,6 +11,7 @@ const CATEGORY = {
   "task.status_changed": "task",
   "task.updated": "task",
   "task.deleted": "task",
+  "task.reassigned": "task",
   "comment.project": "comment",
   "comment.task": "comment",
   "media.added": "file",
@@ -74,6 +75,13 @@ async function logTaskEdit(actorId, task, before) {
     if (!sameValue(before[field], task[field])) changes.push({ field: label, from: before[field] ?? null, to: task[field] ?? null });
   }
   if (!sameValue(before.taskDescription, task.taskDescription)) changes.push({ field: "description" });
+  // Only compared when the caller captured them, so older call sites are unaffected.
+  if ("labels" in before && (before.labels || []).join("|") !== (task.labels || []).join("|")) {
+    changes.push({ field: "labels", from: before.labels || [], to: task.labels || [] });
+  }
+  if ("estimateHours" in before && !sameValue(before.estimateHours, task.estimateHours)) {
+    changes.push({ field: "estimate", from: before.estimateHours ?? null, to: task.estimateHours ?? null });
+  }
   if (changes.length) {
     await logActivity(actorId, task.project, "task.updated", {
       task: task._id,

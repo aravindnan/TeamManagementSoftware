@@ -8,6 +8,7 @@ import {
   Edit,
   Delete,
 } from "@mui/icons-material";
+import { Markdown } from "../helper/markdown";
 import React from "react";
 import { colors } from "../Constants";
 import { Tooltip } from "@mui/material";
@@ -34,8 +35,8 @@ function TaskPageTaskInfo(props:any) {
             </Tooltip>
           </div>
           <div className="text-[40px] font-extrabold">{activeTask?.taskTitle}</div>
-          <div className="text-[14px] w-[90%]">
-            {activeTask?.taskDescription}
+          <div className="w-[90%]">
+            <Markdown source={activeTask?.taskDescription} className="text-[14px]" />
           </div>
           <div className="flex flex-row flex-wrap gap-5 py-5 ">
 

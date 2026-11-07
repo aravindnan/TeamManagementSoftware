@@ -2,6 +2,15 @@ const mongoose = require("mongoose");
 const { mediaSchema } = require("./media");
 const { TASK_STATUSES } = require("../utils/constants");
 
+const subtaskSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true, maxlength: 200 },
+    done: { type: Boolean, default: false },
+    completedAt: { type: Date },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+
 const taskSchema = new mongoose.Schema(
   {
     taskTitle: { type: String, required: true, trim: true },
@@ -17,6 +26,11 @@ const taskSchema = new mongoose.Schema(
     // Kept as strings for compatibility with the existing UI date handling.
     dueDate: { type: String },
     assignedOn: { type: String },
+    // Free-form tags, normalised by the API (lower-case, deduplicated, at most 8).
+    labels: { type: [String], default: [] },
+    // Rough size of the work in hours; groundwork for capacity planning.
+    estimateHours: { type: Number, min: 0, max: 1000 },
+    subtasks: [subtaskSchema],
     attachedMediaURLSet: [mediaSchema],
     taskComments: [{ type: mongoose.Schema.Types.ObjectId, ref: "Comment" }],
   },

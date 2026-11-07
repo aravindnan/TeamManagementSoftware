@@ -163,3 +163,33 @@ describe("shouldRetry", () => {
     expect(shouldRetry(0, new NotSignedInError())).toBe(false);
   });
 });
+
+describe("task drawer writes", () => {
+  test("a PATCH refreshes the task, every project (including the task's own history) and the user's lists", () => {
+    client.setQueryData(qk.activity(P, `task:${T}`), {});
+    run("patch", `/patch-task-by-id/${T}`);
+    for (const key of [qk.task(T), qk.project(P), qk.project(Q), qk.activity(P, `task:${T}`), qk.me]) expect(stale(key)).toBe(true);
+  });
+
+  test.each([
+    ["post", `/add-subtask-to-task/${T}`],
+    ["put", `/update-subtask/${T}/s1`],
+    ["delete", `/delete-subtask/${T}/s1`],
+  ])("%s %s writes the returned sub-tasks into the cached task without refetching it", (method, url) => {
+    client.setQueryData(qk.activity(P, `task:${T}`), {});
+    run(method, url, { subtasks: [{ _id: "s1", title: "One", done: true }] });
+    expect((client.getQueryData(qk.task(T)) as any).subtasks).toEqual([{ _id: "s1", title: "One", done: true }]);
+    expect(stale(qk.task(T))).toBe(false); // no refetch of the task itself
+    expect(stale(qk.project(P))).toBe(true); // cards show sub-task progress
+    expect(stale(qk.me)).toBe(false); // sub-tasks do not change the user's lists
+  });
+
+  test("if the response has no sub-task list, the task is refetched to be safe", () => {
+    run("post", `/add-subtask-to-task/${T}`, {});
+    expect(stale(qk.task(T))).toBe(true);
+  });
+
+  test("sub-task writes for an uncached task are harmless", () => {
+    expect(() => run("post", "/add-subtask-to-task/unknown", { subtasks: [] })).not.toThrow();
+  });
+});

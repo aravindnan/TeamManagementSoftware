@@ -17,3 +17,24 @@ export const addMediaToTask = (taskId: string, mediaDataArray: any[]) =>
 
 export const deleteMediaFromTask = (taskId: string, mediaURL: string) =>
   call(api.delete(`/remove-media-from-task/${taskId}`, { data: { mediaURL } }));
+
+export interface TaskChanges {
+  taskTitle?: string;
+  taskDescription?: string;
+  taskPriority?: "High" | "Medium" | "Low";
+  taskStatus?: string;
+  dueDate?: string | null;
+  labels?: string[];
+  estimateHours?: number | null;
+  assignedTo?: string;
+}
+
+/** Partial update: send only the fields that changed. */
+export const patchTask = (taskId: string, changes: TaskChanges) => call(api.patch(`/patch-task-by-id/${taskId}`, changes));
+
+export const addSubtask = (taskId: string, title: string) => call(api.post(`/add-subtask-to-task/${taskId}`, { title }));
+
+export const updateSubtask = (taskId: string, subtaskId: string, changes: { title?: string; done?: boolean }) =>
+  call(api.put(`/update-subtask/${taskId}/${subtaskId}`, changes));
+
+export const deleteSubtask = (taskId: string, subtaskId: string) => call(api.delete(`/delete-subtask/${taskId}/${subtaskId}`));

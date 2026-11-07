@@ -17,7 +17,7 @@ interface Ctx {
 }
 
 interface Rule {
-  method: "post" | "put" | "delete";
+  method: "post" | "put" | "patch" | "delete";
   pattern: RegExp;
   apply: (ctx: Ctx) => void;
 }
@@ -89,6 +89,24 @@ export const RULES: Rule[] = [
 
   { method: "put", pattern: /^\/change-task-status-by-id\/(\w+)$/, apply: taskChanged },
   { method: "put", pattern: /^\/edit-task-by-id\/(\w+)$/, apply: taskChanged },
+  { method: "patch", pattern: /^\/patch-task-by-id\/(\w+)$/, apply: taskChanged },
+
+  // sub-tasks: the server returns the full list, so write it straight into the cached task (no refetch);
+  // projects are refreshed because their task cards show sub-task progress
+  ...(["post", "put", "delete"] as const).map(
+    (method): Rule => ({
+      method,
+      pattern: /^\/(?:add-subtask-to-task|update-subtask|delete-subtask)\/(\w+)(?:\/\w+)?$/,
+      apply: ({ client, id, data }) => {
+        if (Array.isArray(data?.subtasks)) {
+          client.setQueryData(qk.task(id), (old: any) => (old ? { ...old, subtasks: data.subtasks } : old));
+        } else {
+          invalidate(client, qk.task(id));
+        }
+        invalidate(client, qk.projects);
+      },
+    })
+  ),
   {
     method: "delete",
     pattern: /^\/delete-task-by-id\/(\w+)$/,

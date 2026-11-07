@@ -78,9 +78,38 @@ const editTask = z.object({
 });
 const changeStatus = z.object({ newStatus: z.enum(TASK_STATUSES) });
 
+const label = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(1, "Label cannot be empty")
+  .max(24, "Labels are at most 24 characters")
+  .regex(/^[a-z0-9][a-z0-9 _-]*$/, "Labels may contain letters, numbers, spaces, - and _");
+const dedupe = (xs) => [...new Set(xs)];
+
+// Partial update used by the task drawer: send only what changed.
+const patchTask = z
+  .object({
+    taskTitle: trimmed(1, 200, "Task title").optional(),
+    taskDescription: z.string().max(5000).optional(),
+    taskPriority: z.enum(["High", "Medium", "Low"]).optional(),
+    taskStatus: z.enum(TASK_STATUSES).optional(),
+    dueDate: z.union([z.string().trim().max(60), z.null()]).optional(),
+    labels: z.array(label).max(8, "At most 8 labels").transform(dedupe).optional(),
+    estimateHours: z.union([z.number().min(0).max(1000), z.null()]).optional(),
+    assignedTo: objectId.optional(),
+  })
+  .refine((o) => Object.keys(o).length > 0, "Nothing to update");
+
+const addSubtask = z.object({ title: trimmed(1, 200, "Sub-task") });
+const updateSubtask = z
+  .object({ title: trimmed(1, 200, "Sub-task").optional(), done: z.boolean().optional() })
+  .refine((o) => Object.keys(o).length > 0, "Nothing to update");
+
 // ---- activity feed
 const activityQuery = z.object({
   before: objectId.optional(),
+  task: objectId.optional(), // only the history of one task
   category: z.enum(["project", "task", "comment", "file", "member"]).optional(),
   limit: z.coerce.number().int().min(1).max(50).optional().default(20),
 });
@@ -100,5 +129,5 @@ const removeMedia = z.object({ mediaURL: z.string().url().max(2048) });
 module.exports = {
   idParam, register, login, updateProfile, userSearch,
   createProject, editProject, memberBody, addTask,
-  editTask, changeStatus, comment, addMedia, removeMedia, activityQuery, notificationQuery,
+  editTask, changeStatus, comment, addMedia, removeMedia, activityQuery, notificationQuery, patchTask, addSubtask, updateSubtask,
 };

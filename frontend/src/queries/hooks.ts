@@ -87,9 +87,10 @@ export interface ActivityPage {
   nextCursor: string | null;
 }
 
-export function useProjectActivity(projectId: string, category: ActivityCategory | "all", pageSize = 20) {
+export function useProjectActivity(projectId: string, category: ActivityCategory | "all", pageSize = 20, taskId?: string) {
   return useInfiniteQuery({
-    queryKey: qk.activity(projectId, category),
+    // task history sits under the project's activity prefix, so project-level invalidation reaches it too
+    queryKey: qk.activity(projectId, taskId ? `task:${taskId}` : category),
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }): Promise<ActivityPage> =>
       unwrap(
@@ -97,6 +98,7 @@ export function useProjectActivity(projectId: string, category: ActivityCategory
           limit: pageSize,
           ...(pageParam ? { before: pageParam } : {}),
           ...(category !== "all" ? { category } : {}),
+          ...(taskId ? { task: taskId } : {}),
         })
       ),
     getNextPageParam: (last) => last.nextCursor ?? undefined,

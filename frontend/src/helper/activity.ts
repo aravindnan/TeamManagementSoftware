@@ -37,6 +37,10 @@ const describeChange = (c: any, prefix = ""): string => {
       return `${prefix}${c.field}: ${quote(c.from)} → ${quote(c.to)}`;
     case "due date":
       return `${prefix}due date: ${fmtDate(c.from)} → ${fmtDate(c.to)}`;
+    case "labels":
+      return `${prefix}labels: ${(c.from || []).join(", ") || "none"} → ${(c.to || []).join(", ") || "none"}`;
+    case "estimate":
+      return `${prefix}estimate: ${c.from == null ? "none" : `${c.from}h`} → ${c.to == null ? "none" : `${c.to}h`}`;
     case "description":
       return `${prefix}description edited`;
     default:
@@ -65,6 +69,8 @@ export function describeActivity(item: ActivityItem): ActivityText {
       return { lead: "moved", subject: d.title, taskId, trail: `from ${d.from} to ${d.to}` };
     case "task.updated":
       return { lead: "updated task", subject: d.title, taskId, detail: (d.changes || []).map((c: any) => describeChange(c)).join(" · ") };
+    case "task.reassigned":
+      return { lead: "reassigned", subject: d.title, taskId, trail: `from ${d.from} to ${d.to}` };
     case "task.deleted":
       return { lead: "deleted task", subject: d.title }; // gone, so no link
     case "comment.project":

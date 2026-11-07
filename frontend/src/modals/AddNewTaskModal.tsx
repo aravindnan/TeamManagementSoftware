@@ -4,7 +4,7 @@ import { Close } from "@mui/icons-material";
 import ErrorBox from "../common/ErrorBox";
 import { addTaskToProject } from "../services/projectServices";
 import APIResponseStatus from "../common/APIResponseStatus";
-import { Link } from "react-router-dom";
+import TaskLink from "../components/TaskLink";
 
 function AddNewTaskModal(props: any) {
   const { setAddTaskModal,activeProject} = props;
@@ -257,13 +257,13 @@ function AddNewTaskModal(props: any) {
             >
               Back To Project
             </button>
-            <Link to={`/task-page?id=${createdTaskId}`}>
+            <TaskLink taskId={createdTaskId}>
             <div
               className={`bg-[#012b39f2] hover:bg-[#012B39] rounded-[8px] text-white font-bold text-[12px] py-2 px-5`}
             >
               Go To Task
             </div>
-            </Link>
+            </TaskLink>
         </div>:
         createTaskStatus==="create-failure"?
         <div className="flex justify-end gap-4 mt-4">

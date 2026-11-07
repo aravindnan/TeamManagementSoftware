@@ -8,7 +8,7 @@ import {
   Refresh,
 } from "@mui/icons-material";
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import TaskLink from "../components/TaskLink";
 import moment from "moment";
 import ModalOverlay from "../common/ModalOverlay";
 import NoDataMessage from "../common/NoDataMessage";
@@ -120,9 +120,9 @@ function ActivityModal({ activeProject, setActivityModal }: any) {
                               <>
                                 {" "}
                                 {t.taskId ? (
-                                  <Link to={`/task-page?id=${t.taskId}`} className="font-semibold hover:underline underline-offset-2">
+                                  <TaskLink taskId={t.taskId} className="font-semibold hover:underline underline-offset-2">
                                     {t.subject}
-                                  </Link>
+                                  </TaskLink>
                                 ) : (
                                   <span className="font-semibold">{t.subject}</span>
                                 )}

@@ -7,6 +7,7 @@ import AddNewTaskModal from "../modals/AddNewTaskModal";
 import ViewAllTaskModal from "../modals/ViewAllTaskModal";
 import BoardModal from "../modals/BoardModal";
 import ActivityModal from "../modals/ActivityModal";
+import TaskDrawer from "../components/TaskDrawer";
 import Sidebar from "../components/Sidebar";
 import UserProfileModal from "../modals/UserProfileModal";
 import RemoveMemberConfirmationModal from "../modals/RemoveMemberConfirmationModal";
@@ -45,8 +46,19 @@ function ProjectPage() {
   const [myTasks,setMytasks] = useState<any>([])
 
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const projectId = searchParams.get("id")
+  const openTaskId = searchParams.get("task")
+  // The drawer lives in the URL, so it can be shared, survives a reload and closes with the back button.
+  const closeDrawer = () =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete("task")
+        return next
+      },
+      { replace: true }
+    )
 
   // Both reads come from the shared query cache: opening a project you have just seen is instant,
   // and every write (a comment, a status change, a new member...) refreshes exactly what it affected.
@@ -149,6 +161,15 @@ function ProjectPage() {
      activeProject={activeProject} 
      setAddTaskModal={setAddTaskModal}
      />:null
+     }
+     {
+      openTaskId && projectQuery.data ?
+      <TaskDrawer
+      taskId={openTaskId}
+      project={activeProject}
+      me={myProfiledata}
+      onClose={closeDrawer}
+      />:null
      }
      {
       activityModal?

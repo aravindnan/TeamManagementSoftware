@@ -1,7 +1,7 @@
 import { PendingActions } from "@mui/icons-material";
 import React, { useEffect } from "react";
 import { Tooltip } from "@mui/material";
-import { Link } from "react-router-dom";
+import TaskLink from "./TaskLink";
 import moment from "moment";
 import NoDataMessage from "../common/NoDataMessage";
 
@@ -40,7 +40,7 @@ function ProjectPageMyTasks(props:any) {
           {myTasks?.map((node: any) => (
             <Tooltip
              title="View Task" arrow placement="right" key={node._id}>
-            <Link to={`/task-page?id=${node._id}`}>
+            <TaskLink taskId={node._id}>
               <div className="flex flex-row group rounded-[4px]  text-[12px] max-w-full break-words hover:bg-C44 cursor-pointer transition-all ">
                 <div
                   className={` group-hover:px-2 min-w-[10px] group-hover:min-w-[80px] duration-200 flex justify-center items-center  ${
@@ -65,7 +65,7 @@ function ProjectPageMyTasks(props:any) {
                 </div>
                 <div className="p-2 max-w-[80%] break-words">{node.taskTitle}</div>
               </div>
-            </Link> 
+            </TaskLink> 
             </Tooltip>
           ))}
         </div>:

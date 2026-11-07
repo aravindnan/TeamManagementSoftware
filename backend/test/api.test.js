@@ -254,6 +254,149 @@ describe("projects & tasks", () => {
   });
 });
 
+describe("task drawer API", () => {
+  async function scene() {
+    const m = await signup(1), t = await signup(2), b = await signup(4), outsider = await signup(3);
+    const projectId = (await m.a.post(`/create-new-project-for-user-id/${m.id}`).send({ projectName: "Proj" })).body.project._id;
+    await m.a.post(`/add-new-member-by-project-id/${projectId}`).send({ memberId: t.id });
+    await m.a.post(`/add-new-member-by-project-id/${projectId}`).send({ memberId: b.id });
+    const taskId = (await m.a.post(`/add-new-task-by-project-id/${projectId}`).send({ taskTitle: "Ship it", taskPriority: "Low", dueDate: "2030-01-01", assignedTo: t.id })).body.taskId;
+    return { m, t, b, outsider, projectId, taskId };
+  }
+  const patch = (u, id, body) => u.a.patch(`/patch-task-by-id/${id}`).send(body);
+  const getTask = async (u, id) => (await u.a.get(`/get-task-by-id/${id}`).expect(200)).body;
+  const feed = async (u, projectId, qs = "") => (await u.a.get(`/get-project-activity-by-id/${projectId}${qs}`).expect(200)).body.items;
+
+  test("a partial update changes only what was sent and is recorded in the history", async () => {
+    const { t, projectId, taskId } = await scene();
+    const res = await patch(t, taskId, { taskTitle: "Ship it today", labels: ["Bug", "urgent"], estimateHours: 3.5, taskDescription: "# Plan\n- one" }).expect(200);
+    expect(res.body.editStatus).toBe(true);
+    const task = await getTask(t, taskId);
+    expect(task).toMatchObject({ taskTitle: "Ship it today", taskPriority: "Low", dueDate: "2030-01-01", labels: ["bug", "urgent"], estimateHours: 3.5, taskDescription: "# Plan\n- one" });
+    const updated = (await feed(t, projectId)).find((i) => i.verb === "task.updated");
+    expect(updated.data.changes.map((c) => c.field).sort()).toEqual(["description", "estimate", "labels", "title"]);
+    expect(updated.data.changes.find((c) => c.field === "labels")).toMatchObject({ from: [], to: ["bug", "urgent"] });
+  });
+
+  test("labels are normalised, deduplicated and bounded", async () => {
+    const { t, taskId } = await scene();
+    await patch(t, taskId, { labels: ["  Bug ", "bug", "BUG", "front-end"] }).expect(200);
+    expect((await getTask(t, taskId)).labels).toEqual(["bug", "front-end"]);
+    await patch(t, taskId, { labels: ["<script>"] }).expect(400);
+    await patch(t, taskId, { labels: ["x".repeat(25)] }).expect(400);
+    await patch(t, taskId, { labels: [""] }).expect(400);
+    await patch(t, taskId, { labels: Array.from({ length: 9 }, (_, i) => `l${i}`) }).expect(400);
+    await patch(t, taskId, { labels: [] }).expect(200); // clearing is allowed
+    expect((await getTask(t, taskId)).labels).toEqual([]);
+  });
+
+  test("a due date and an estimate can be cleared with null", async () => {
+    const { t, taskId } = await scene();
+    await patch(t, taskId, { estimateHours: 4 }).expect(200);
+    await patch(t, taskId, { dueDate: null, estimateHours: null }).expect(200);
+    const task = await getTask(t, taskId);
+    expect(task.dueDate).toBeUndefined();
+    expect(task.estimateHours).toBeUndefined();
+  });
+
+  test("rejects empty or invalid updates", async () => {
+    const { t, taskId } = await scene();
+    await patch(t, taskId, {}).expect(400);
+    await patch(t, taskId, { unknownField: 1 }).expect(400); // unknown keys are stripped, leaving nothing
+    await patch(t, taskId, { taskPriority: "Urgent" }).expect(400);
+    await patch(t, taskId, { taskTitle: "   " }).expect(400);
+    await patch(t, taskId, { estimateHours: -1 }).expect(400);
+    await patch(t, taskId, { estimateHours: 5000 }).expect(400);
+    await patch(t, taskId, { taskStatus: "Banana" }).expect(400);
+    await t.a.patch("/patch-task-by-id/not-an-id").send({ taskTitle: "x" }).expect(400);
+  });
+
+  test("only the manager, creator or assignee may edit; others get 403", async () => {
+    const { m, b, outsider, taskId } = await scene();
+    await patch(b, taskId, { taskTitle: "hax" }).expect(403);
+    await patch(outsider, taskId, { taskTitle: "hax" }).expect(403);
+    await patch(m, taskId, { taskTitle: "boss edit" }).expect(200);
+    expect((await getTask(m, taskId)).taskTitle).toBe("boss edit");
+  });
+
+  test("status can be changed through PATCH, with completedAt and history kept in step", async () => {
+    const { t, projectId, taskId } = await scene();
+    await patch(t, taskId, { taskStatus: "Completed" }).expect(200);
+    expect((await mongoose.model("Task").findById(taskId)).completedAt).toBeInstanceOf(Date);
+    expect((await feed(t, projectId))[0]).toMatchObject({ verb: "task.status_changed", data: { from: "To Do", to: "Completed" } });
+  });
+
+  test("reassigning moves the task between users' lists, notifies people and is recorded", async () => {
+    const { m, t, b, projectId, taskId } = await scene();
+    await patch(m, taskId, { assignedTo: b.id }).expect(200);
+    const task = await getTask(m, taskId);
+    expect(task.assignedTo._id).toBe(b.id);
+    expect((await t.a.get("/me")).body.allTasks.map((x) => x._id)).not.toContain(taskId);
+    expect((await b.a.get("/me")).body.allTasks.map((x) => x._id)).toContain(taskId);
+    const entry = (await feed(m, projectId))[0];
+    expect(entry).toMatchObject({ verb: "task.reassigned", data: { title: "Ship it", from: "First2 Last2", to: "First4 Last4" } });
+    const types = async (u) => (await u.a.get("/notifications")).body.items.map((n) => n.type);
+    expect(await types(b)).toContain("task.reassigned"); // the new owner
+    expect(await types(t)).toContain("task.reassigned"); // the previous owner
+    expect(await types(m)).not.toContain("task.reassigned"); // the actor
+  });
+
+  test("reassignment is restricted to the manager or creator, to members, and ignores no-ops", async () => {
+    const { m, t, b, outsider, projectId, taskId } = await scene();
+    await patch(t, taskId, { assignedTo: b.id }).expect(403); // the assignee may edit but not hand it off
+    await patch(m, taskId, { assignedTo: outsider.id }).expect(400); // not a project member
+    const before = (await feed(m, projectId)).length;
+    await patch(m, taskId, { assignedTo: t.id }).expect(200); // already theirs
+    expect((await feed(m, projectId)).length).toBe(before); // nothing logged
+  });
+
+  test("sub-tasks can be added, completed, renamed and removed", async () => {
+    const { t, taskId } = await scene();
+    const add = await t.a.post(`/add-subtask-to-task/${taskId}`).send({ title: "  Write tests " }).expect(201);
+    expect(add.body.subtasks).toHaveLength(1);
+    expect(add.body.subtasks[0]).toMatchObject({ title: "Write tests", done: false });
+    const sid = add.body.subtasks[0]._id;
+
+    const done = await t.a.put(`/update-subtask/${taskId}/${sid}`).send({ done: true }).expect(200);
+    expect(done.body.subtasks[0].done).toBe(true);
+    expect(done.body.subtasks[0].completedAt).toBeDefined();
+    const reopened = await t.a.put(`/update-subtask/${taskId}/${sid}`).send({ done: false }).expect(200);
+    expect(reopened.body.subtasks[0].completedAt).toBeUndefined();
+    await t.a.put(`/update-subtask/${taskId}/${sid}`).send({ title: "Write more tests" }).expect(200);
+    expect((await getTask(t, taskId)).subtasks[0].title).toBe("Write more tests");
+
+    const removed = await t.a.delete(`/delete-subtask/${taskId}/${sid}`).expect(200);
+    expect(removed.body.subtasks).toEqual([]);
+  });
+
+  test("sub-task validation, limits and permissions", async () => {
+    const { m, t, b, taskId } = await scene();
+    await t.a.post(`/add-subtask-to-task/${taskId}`).send({ title: "   " }).expect(400);
+    await t.a.post(`/add-subtask-to-task/${taskId}`).send({ title: "x".repeat(201) }).expect(400);
+    const sid = (await t.a.post(`/add-subtask-to-task/${taskId}`).send({ title: "One" })).body.subtasks[0]._id;
+    await t.a.put(`/update-subtask/${taskId}/${sid}`).send({}).expect(400);
+    await t.a.put(`/update-subtask/${taskId}/aaaaaaaaaaaaaaaaaaaaaaaa`).send({ done: true }).expect(404);
+    await b.a.post(`/add-subtask-to-task/${taskId}`).send({ title: "nope" }).expect(403);
+    await b.a.put(`/update-subtask/${taskId}/${sid}`).send({ done: true }).expect(403);
+    await b.a.delete(`/delete-subtask/${taskId}/${sid}`).expect(403);
+    await m.a.put(`/update-subtask/${taskId}/${sid}`).send({ done: true }).expect(200); // the manager may
+    for (let i = 0; i < 49; i++) await t.a.post(`/add-subtask-to-task/${taskId}`).send({ title: `s${i}` }).expect(201);
+    await t.a.post(`/add-subtask-to-task/${taskId}`).send({ title: "one too many" }).expect(400);
+  });
+
+  test("the activity feed can be narrowed to one task", async () => {
+    const { m, t, projectId, taskId } = await scene();
+    const other = (await m.a.post(`/add-new-task-by-project-id/${projectId}`).send({ taskTitle: "Other", assignedTo: t.id })).body.taskId;
+    await t.a.put(`/change-task-status-by-id/${taskId}`).send({ newStatus: "In Review" }).expect(200);
+    await t.a.put(`/change-task-status-by-id/${other}`).send({ newStatus: "In Review" }).expect(200);
+    const mine = await feed(m, projectId, `?task=${taskId}`);
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine.every((i) => String(i.task) === taskId)).toBe(true);
+    expect(mine.map((i) => i.verb)).toEqual(["task.status_changed", "task.created"]);
+    await m.a.get(`/get-project-activity-by-id/${projectId}?task=nope`).expect(400);
+  });
+});
+
 describe("analytics", () => {
   async function scene() {
     const m = await signup(1), t = await signup(2), outsider = await signup(3);

@@ -31,6 +31,18 @@ describe("describeActivity", () => {
     expect(r.trail).toBe("and assigned it to Bo");
     expect(r.detail).toBe("High priority · due Nov 20, 2026");
   });
+  test("reassignment, labels and estimates are described", () => {
+    expect(describeActivity(item("task.reassigned", { title: "T", from: "Ann", to: "Bo" }, { task: "t" }))).toEqual({
+      lead: "reassigned", subject: "T", taskId: "t", trail: "from Ann to Bo",
+    });
+    const r = describeActivity(item("task.updated", { title: "T", changes: [
+      { field: "labels", from: [], to: ["bug", "urgent"] },
+      { field: "labels", from: ["bug"], to: [] },
+      { field: "estimate", from: null, to: 3.5 },
+      { field: "estimate", from: 2, to: null },
+    ] }));
+    expect(r.detail).toBe("labels: none → bug, urgent · labels: bug → none · estimate: none → 3.5h · estimate: 2h → none");
+  });
   test("long file lists are summarised", () => {
     expect(describeActivity(item("media.added", { names: ["a", "b", "c", "d"], scope: "project" })).lead).toBe("attached a, b and 2 more to the project");
     expect(describeActivity(item("media.added", { names: ["a.png"], scope: "task", title: "T" }, { task: "t" }))).toMatchObject({ lead: "attached a.png to", subject: "T", taskId: "t" });

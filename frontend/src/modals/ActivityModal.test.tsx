@@ -30,7 +30,8 @@ test("renders readable entries, grouped under Today, with task links", async () 
   });
   renderModal();
   expect(await screen.findByText("Today")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Ship it" })).toHaveAttribute("href", "/task-page?id=t9");
+  // task links open the drawer on the project page: they add ?task=<id> to the current URL
+  expect(screen.getByRole("link", { name: "Ship it" })).toHaveAttribute("href", "/?task=t9");
   expect(screen.getByText(/from To Do to Completed/)).toBeInTheDocument();
   expect(screen.getByText("“Nice work”")).toBeInTheDocument();
   expect(screen.getAllByText("Ana Lee")).toHaveLength(2);

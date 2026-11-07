@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import TaskLink from "./TaskLink";
 import moment from "moment";
 import RiskChip, { RiskLevel } from "./RiskChip";
 
@@ -80,12 +80,12 @@ function RiskRadar({ risk, error, project, onRetry }: Props) {
           <article key={t.taskId} className="bg-white rounded-[6px] p-3 shadow-sm">
             <div className="flex flex-row flex-wrap items-center gap-2">
               <RiskChip level={t.level as RiskLevel} />
-              <Link
-                to={`/task-page?id=${t.taskId}`}
+              <TaskLink
+                taskId={t.taskId}
                 className="text-[13px] font-semibold text-C11 hover:underline underline-offset-2 break-words"
               >
                 {t.taskTitle}
-              </Link>
+              </TaskLink>
               <span className="ml-auto text-[10px] font-semibold text-gray-500">{`${t.taskStatus} · ${names.get(t.assignedTo) || "Unassigned"}${
                 t.dueDate ? ` · due ${moment(t.dueDate).format("MMM D")}` : ""
               }`}</span>

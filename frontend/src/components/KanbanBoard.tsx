@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { qk } from "../queries/keys";
-import { Link } from "react-router-dom";
+import TaskLink from "./TaskLink";
 import moment from "moment";
 import { TASK_STATUSES, TaskStatus } from "../Constants";
 import { canMoveTask, groupTasksByStatus, isOverdue, withStatus } from "../helper/board";
@@ -159,13 +159,13 @@ function KanbanBoard({ project, me, riskByTask = {} }: Props) {
                         movable ? "cursor-grab active:cursor-grabbing" : ""
                       } ${dragId === task._id ? "opacity-40" : ""}`}
                     >
-                      <Link
-                        to={`/task-page?id=${task._id}`}
+                      <TaskLink
+                        taskId={task._id}
                         draggable={false}
                         className="block text-[12px] font-semibold text-C11 hover:underline underline-offset-2 break-words"
                       >
                         {task.taskTitle}
-                      </Link>
+                      </TaskLink>
                       {(riskByTask[task._id]?.level === "high" || riskByTask[task._id]?.level === "medium") && (
                         <div className="mt-1">
                           <RiskChip level={riskByTask[task._id].level} reasons={riskByTask[task._id].reasons} />

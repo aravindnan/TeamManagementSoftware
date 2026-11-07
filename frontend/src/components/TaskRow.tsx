@@ -1,6 +1,6 @@
 import React from "react";
 import { Tooltip } from "@mui/material";
-import { Link } from "react-router-dom";
+import TaskLink from "./TaskLink";
 import moment from "moment";
 
 const priorityBg = (priority?: string) =>
@@ -10,7 +10,7 @@ const priorityBg = (priority?: string) =>
 function TaskRow({ task }: { task: any }) {
   return (
     <Tooltip title="View Task" arrow placement="right">
-      <Link to={`/task-page?id=${task._id}`}>
+      <TaskLink taskId={task._id}>
         <div className="flex flex-row group rounded-[4px]  text-[12px] max-w-full break-words hover:bg-C44 cursor-pointer transition-all w-full items-center">
           <div className="flex flex-row flex-1">
             <div
@@ -28,7 +28,7 @@ function TaskRow({ task }: { task: any }) {
             <div className="p-2 max-w-[80%] break-words">{task?.taskTitle}</div>
           </div>
         </div>
-      </Link>
+      </TaskLink>
     </Tooltip>
   );
 }

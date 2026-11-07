@@ -54,10 +54,11 @@ exports.get_project_overall_performance_by_id = asyncHandler(async (req, res) =>
 exports.get_project_activity_by_id = asyncHandler(async (req, res) => {
   const project = await loadProject(req.params.projectId);
   requireMember(project, req.user.id);
-  const { before, category, limit } = req.query;
+  const { before, category, limit, task } = req.query;
 
   const filter = { project: project._id };
   if (category) filter.category = category;
+  if (task) filter.task = task;
   if (before) filter._id = { $lt: before }; // cursor = _id of the last item already shown
 
   const rows = await Activity.find(filter).sort({ _id: -1 }).limit(limit + 1).lean();

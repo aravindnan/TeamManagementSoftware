@@ -10,6 +10,14 @@ describe("describeNotification", () => {
       lead: "assigned you", subject: "Ship", to: "/task-page?id=t1", detail: "High priority · due Nov 20, 2026",
     });
   });
+  test("task notifications open the task in its project's drawer when the project is known", () => {
+    const r = describeNotification(n("task.status_changed", { title: "T", from: "To Do", to: "Completed" }, { task: "t1", project: "p9" }));
+    expect(r.to).toBe("/project-page?id=p9&task=t1");
+  });
+  test("reassignment reads the same for everyone involved", () => {
+    const r = describeNotification(n("task.reassigned", { title: "T", from: "Ann", to: "Bo" }, { task: "t1", project: "p1" }));
+    expect([r.lead, r.subject, r.trail, r.to]).toEqual(["reassigned", "T", "from Ann to Bo", "/project-page?id=p1&task=t1"]);
+  });
   test("status changes read 'moved X from A to B'", () => {
     const r = describeNotification(n("task.status_changed", { title: "T", from: "To Do", to: "Completed" }, { task: "t" }));
     expect([r.lead, r.subject, r.trail]).toEqual(["moved", "T", "from To Do to Completed"]);
