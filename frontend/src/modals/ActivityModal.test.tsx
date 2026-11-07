@@ -1,8 +1,8 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
 import ActivityModal from "./ActivityModal";
 import { getProjectActivity } from "../services/projectServices";
+import { renderWithProviders } from "../testUtils";
 
 jest.mock("../services/projectServices", () => ({ getProjectActivity: jest.fn() }));
 jest.mock("../services/apiClient", () => ({
@@ -16,12 +16,7 @@ const entry = (id: string, verb: string, data: any, extra: any = {}) => ({
   _id: id, verb, category: "task", actorName: "Ana Lee", data, createdAt: now, ...extra,
 });
 const project = { _id: "p1", projectName: "Relaunch" };
-const renderModal = () =>
-  render(
-    <MemoryRouter>
-      <ActivityModal activeProject={project} setActivityModal={() => {}} />
-    </MemoryRouter>
-  );
+const renderModal = () => renderWithProviders(<ActivityModal activeProject={project} setActivityModal={() => {}} />);
 
 beforeEach(() => mocked.mockReset());
 

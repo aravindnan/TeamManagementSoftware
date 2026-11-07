@@ -7,7 +7,7 @@ import APIResponseStatus from "../common/APIResponseStatus";
 import { Link } from "react-router-dom";
 
 function AddNewTaskModal(props: any) {
-  const { setAddTaskModal,activeProject,triggerRerender} = props;
+  const { setAddTaskModal,activeProject} = props;
 
   const [error, setError] = useState<string | null>(null);
   const [createTaskStatus,setCreateTaskStatus]=useState<any>("not-created");
@@ -87,7 +87,6 @@ function AddNewTaskModal(props: any) {
       if (res?.status) {
         setCreateTaskStatus("create-success")
         setCreatedTaskId(res.taskId)
-        triggerRerender()
       } else {
         setCreateTaskStatus("create-failure")
       }

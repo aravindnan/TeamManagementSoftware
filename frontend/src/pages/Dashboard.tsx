@@ -1,4 +1,4 @@
-  import React, { useEffect, useState } from "react";
+  import React, { useMemo, useState } from "react";
     import { colors } from "../Constants";
   // import { AccountCircle, Logout } from "@mui/icons-material";
   // import { Tooltip } from "@mui/material";
@@ -15,11 +15,9 @@
   // import Loader from "../common/Loader";
   import LogoutModal from "../modals/LogoutModal";
   // import { url } from "inspector";
-    import { useDispatch, useSelector } from "react-redux";
-  import * as authActions from "../redux/actions/authActions"
-    import { getMe } from "../services/authServices";
-  import { useNavigate } from "react-router";
 import TopBar from "../components/TopBar";
+import { useRequireMe } from "../queries/hooks";
+import { NotSignedInError } from "../queries/unwrap";
 import APIResponseStatus from "../common/APIResponseStatus";
 
   function Dashboard() {
@@ -27,55 +25,22 @@ import APIResponseStatus from "../common/APIResponseStatus";
     const [createNewProjectModal, setCreateNewProjectModal] =useState<Boolean>(false);
     const [userProfileModal, setUserProfileModal] = useState<Boolean>(false);
     const [logoutModal, setLogoutModal] = useState<Boolean>(false);
-    const [rerender, setRerender] = useState(false);
-    const [pendingTasks,setPendingTasks]= useState<any>([])
-    const [completedTasks,setCompletedTasks]= useState<any>([])
-    const [networkError,setNetworkError] = useState<Boolean>(false)
-    const [pageLoading, setPageLoading] = useState<any>("not-loaded")
 
-    const myProfiledata = useSelector(
-      (state: any) => state.authReducer.myUserProfile
-    );
+    // The profile comes from the shared query cache: instant when you navigate back here, and refreshed
+    // automatically whenever something you did makes it stale (see queries/invalidation.ts).
+    const meQuery = useRequireMe()
+    const myProfiledata: any = meQuery.data
+    const networkError = (meQuery.error as any)?.code === "ERR_NETWORK"
+    const pageLoading =
+      myProfiledata ? "loaded" : meQuery.isError && !(meQuery.error instanceof NotSignedInError) ? "error" : "not-loaded"
 
-    const dispatch = useDispatch()
-    const navigate = useNavigate()
-    useEffect(() => {
-      let cancelled = false
-      ;(async () => {
-        const res: any = await getMe()
-        if (cancelled) return
-        if (res === null) {
-          navigate("/login")
-        } else if (res?._id) {
-          setPageLoading("loaded")
-          dispatch(authActions.loginAction(res))
-        } else {
-          setNetworkError(res?.code === "ERR_NETWORK")
-          setPageLoading("error")
-        }
-      })()
-      return () => { cancelled = true }
-    }, [rerender, navigate, dispatch]);
-
-  useEffect(()=>{
-    if (myProfiledata?.allTasks) {
-      const tasks = myProfiledata.allTasks;
-
-      const pending = tasks.filter((task: any) => task.taskStatus !== 'Completed');
-      const completed = tasks.filter((task: any) => task.taskStatus === 'Completed');
-
-      setPendingTasks(pending);
-      setCompletedTasks(completed);
-    }
-
-  },[myProfiledata])
-
-  const triggerRerender = () => {
-    setRerender((prev) => !prev);
-  };
-      
-
-
+    const { pendingTasks, completedTasks } = useMemo(() => {
+      const tasks: any[] = myProfiledata?.allTasks || []
+      return {
+        pendingTasks: tasks.filter((task) => task.taskStatus !== "Completed"),
+        completedTasks: tasks.filter((task) => task.taskStatus === "Completed"),
+      }
+    }, [myProfiledata])
 
     return (
       <>
@@ -141,7 +106,6 @@ import APIResponseStatus from "../common/APIResponseStatus";
                 //Create project modal
                 createNewProjectModal ? (
                   <CreateNewProjectModal
-                    triggerRerender={triggerRerender}
                     setCreateNewProjectModal={setCreateNewProjectModal}
                   />
                 ) : null
@@ -152,7 +116,6 @@ import APIResponseStatus from "../common/APIResponseStatus";
                 // User Profile Modal
                 userProfileModal ? (
                   <UserProfileModal 
-                  triggerRerender={triggerRerender}
                   setUserProfileModal={setUserProfileModal} />
                 ) : null
               }

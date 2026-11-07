@@ -6,7 +6,7 @@ import APIResponseStatus from '../common/APIResponseStatus'
 
 function RemoveMemberConfirmationModal(props:any) {
 
-    const {setRemoveMemberModal,activeProject,memberData,triggerRerender}=props
+    const {setRemoveMemberModal,activeProject,memberData}=props
     const [deleteMemberStatus,setDeleteMemberStatus]= useState<string>("not-deleted")
 
     const handleRemove=async()=>{
@@ -17,7 +17,6 @@ function RemoveMemberConfirmationModal(props:any) {
       const res: any = await deleteMemberFromProject(activeProject._id,userData)
       if (res?.deleteStatus) {
         setDeleteMemberStatus("delete-success")
-        triggerRerender()
       } else {
         setDeleteMemberStatus("delete-failure")
       }

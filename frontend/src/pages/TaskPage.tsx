@@ -1,7 +1,8 @@
 
 
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useRequireMe, useTask } from "../queries/hooks";
 
 import TaskPageTaskInfo from "../components/TaskPageTaskInfo";
 import TaskPageAttachedMedia from "../components/TaskPageAttachedMedia";
@@ -13,14 +14,14 @@ import ViewMediaModal from "../modals/ViewMediaModal";
 import DeleteTaskConfirmationModal from "../modals/DeleteTaskConfirmationModal";
 import ViewMemberModal from "../modals/ViewMemberModal";
 import TaskPageAddMediaModal from "../modals/TaskPageAddMediaModal";
-import { getMe } from "../services/authServices";
-import { useDispatch, useSelector } from "react-redux";
-import * as authActions from "../redux/actions/authActions"
-import { getTaskById } from "../services/taskServices";
+import { useSelector } from "react-redux";
 import TopBar from "../components/TopBar";
 import ChangeStatusModal from "../modals/ChangeStatusModal";
 import APIResponseStatus from "../common/APIResponseStatus";
 
+
+// Stable empty value while the task loads, so effect dependencies do not churn.
+const NO_TASK = {};
 
 function TaskPage() {
   const [userProfileModal,setUserProfileModal]=useState<Boolean>(false)
@@ -30,63 +31,29 @@ function TaskPage() {
   const [viewMemberModal,setViewMemberModal] = useState<any>({isOpen: false, memberData: null})
   const [addMediaModal,setAddMediaModal] = useState<Boolean>(false)
   const [taskStatusModal,setTaskStatusModal] = useState<Boolean>(false)
-  const [activeTask,setActiveTask]= useState<any>({})
-  const [rerender, setRerender] = useState<Boolean>(false)
-  const [networkError,setNetworkError] = useState<Boolean>(false)
-  const [pageLoading, setPageLoading] = useState<any>("not-loaded")
-  
-  const dispatch = useDispatch()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const taskId = searchParams.get("id")
 
-  useEffect(()=>{
-    Object.keys(activeTask).length!==0?
-    window.document.title = activeTask?.taskTitle:window.document.title ="TMS"
-  },[activeTask])
+  // Shared query cache: a task you have just opened is shown instantly, and a comment you post is added
+  // to it directly instead of refetching the whole task (see queries/invalidation.ts).
+  useRequireMe() // redirects signed-out visitors and keeps the Redux copy of the profile current
+  const taskQuery = useTask(taskId)
+  const activeTask: any = taskQuery.data ?? NO_TASK
+  const networkError = (taskQuery.error as any)?.code === "ERR_NETWORK"
+  const pageLoading = taskQuery.data ? "loaded" : taskQuery.isError ? "error" : "not-loaded"
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      const res: any = await getMe()
-      if (cancelled) return
-      if (res === null) {
-        navigate("/login")
-      } else if (res?._id) {
-        dispatch(authActions.loginAction(res))
-      } else {
-        setNetworkError(res?.code === "ERR_NETWORK")
-      }
-    })()
-    return () => { cancelled = true }
-  }, [navigate, dispatch]);
-    
   const myProfiledata = useSelector(
     (state: any) => state.authReducer.myUserProfile
   );
 
   useEffect(() => {
-    const taskId = new URLSearchParams(window.location.search).get("id");
-    if (!taskId) {
-      navigate("/not-found", { replace: true })
-      return
-    }
-    let cancelled = false
-    ;(async () => {
-      const res: any = await getTaskById(taskId)
-      if (cancelled) return
-      if (res?._id) {
-        setPageLoading("loaded")
-        setActiveTask(res)
-      } else {
-        setNetworkError(res?.code === "ERR_NETWORK")
-        setPageLoading("error")
-      }
-    })()
-    return () => { cancelled = true }
-  }, [rerender, navigate]);
+    if (!taskId) navigate("/not-found", { replace: true })
+  }, [taskId, navigate])
 
-  const triggerRerender = () => {
-    setRerender((prev) => !prev);
-  };
+  useEffect(() => {
+    document.title = taskQuery.data?.taskTitle ?? "TMS"
+  }, [taskQuery.data?.taskTitle])
 
 
   return (
@@ -108,7 +75,6 @@ function TaskPage() {
           {/* Task Info */}
           <div className="flex flex-col w-full md:max-w-[50%] lg:max-w-[60%] h-fit">
             <TaskPageTaskInfo 
-            triggerRerender={triggerRerender}
             myProfiledata={myProfiledata}
             setDeleteTaskModal={setDeleteTaskModal}
             setEditTaskModal={setEditTaskModal}
@@ -128,7 +94,6 @@ function TaskPage() {
 
           <div className="flex flex-col flex-1 gap-2 mb-10 md:mb-0">
             <TaskPageTaskStatusMarker
-            triggerRerender={triggerRerender}
             setTaskStatusModal={setTaskStatusModal}  
             myProfiledata={myProfiledata}           
             activeTask={activeTask}
@@ -142,14 +107,12 @@ function TaskPage() {
           // User Profile Modal
           userProfileModal?
           <UserProfileModal 
-          triggerRerender={triggerRerender}
           setUserProfileModal={setUserProfileModal}
           />:null
         }
         {
           editTaskModal?
           <EditTaskModal
-          triggerRerender={triggerRerender}
           activeTask={activeTask}
           data={"data"}
           setEditTaskModal={setEditTaskModal}
@@ -160,7 +123,6 @@ function TaskPage() {
           <ViewMediaModal
           type="task"
           activeTask={activeTask}
-          triggerRerender={triggerRerender}
           mediaData={viewMediaModal.mediaData}
           setViewMediaModal={setViewMediaModal}
 
@@ -183,7 +145,6 @@ function TaskPage() {
        {
         addMediaModal?
           <TaskPageAddMediaModal
-          triggerRerender={triggerRerender}
           activeTask={activeTask}
           setAddMediaModal={setAddMediaModal} 
           />:null
@@ -191,7 +152,6 @@ function TaskPage() {
       {
         taskStatusModal?
         <ChangeStatusModal
-        triggerRerender={triggerRerender}
         activeTask={activeTask}
         setTaskStatusModal={setTaskStatusModal}
         />:null

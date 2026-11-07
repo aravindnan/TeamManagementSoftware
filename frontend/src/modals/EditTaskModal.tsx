@@ -6,7 +6,7 @@ import { editTaskById } from "../services/taskServices";
 import APIResponseStatus from "../common/APIResponseStatus";
 
 function EditTaskModal(props: any) {
-  const { setEditTaskModal,activeTask,triggerRerender } = props;
+  const { setEditTaskModal,activeTask } = props;
   const [error, setError] = useState<string | null>(null);
   const [editTaskStatus,setEditTaskStatus] = useState<string>("not-edited")
 
@@ -71,7 +71,6 @@ function EditTaskModal(props: any) {
       if (res?.editStatus) {
         setEditTaskStatus("edit-success")
         setEditTaskFormData(emptyState)
-        triggerRerender()
       } else {
         setEditTaskStatus("edit-failure")
       }

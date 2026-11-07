@@ -4,7 +4,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { colors } from "../Constants";
 import { ArrowForwardRounded, ReplayRounded, RestartAltRounded, Visibility, VisibilityOff } from "@mui/icons-material";
 import ErrorBox from "../common/ErrorBox";
-import { getMe, registerUser } from "../services/authServices";
+import { registerUser } from "../services/authServices";
+import { useMe } from "../queries/hooks";
 import { errorMessage } from "../services/apiClient";
 import APIResponseStatus from "../common/APIResponseStatus";
 import { Tooltip } from "@mui/material";
@@ -19,12 +20,13 @@ function Register() {
 
   const navigate = useNavigate()
 
+  const { data: me } = useMe();
   useEffect(() => {
     document.title = "TMS • Sign Up";
-    getMe().then((me: any) => {
-      if (me?._id) navigate("/dashboard");
-    });
-  }, [navigate]);
+  }, []);
+  useEffect(() => {
+    if (me) navigate("/dashboard");
+  }, [me, navigate]);
 
   const retryRegister = () => {
     setRegisterStatus("not-registered");

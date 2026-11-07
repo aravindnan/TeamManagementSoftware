@@ -1,11 +1,8 @@
 // Regression tests: services resolve with an error object instead of throwing, so every modal must
 // branch on the response. These used to report success (or hang on "loading") when a request failed.
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { Provider } from "react-redux";
-import { configureStore } from "@reduxjs/toolkit";
-import { MemoryRouter } from "react-router-dom";
-import { rootReducer } from "../redux/rootReducer";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { renderWithProviders, makeTestStore } from "../testUtils";
 import DeleteTaskConfirmationModal from "./DeleteTaskConfirmationModal";
 import ChangeStatusModal from "./ChangeStatusModal";
 import AddNewMemberModal from "./AddNewMemberModal";
@@ -16,19 +13,13 @@ import { getAllUsers } from "../services/userServices";
 jest.mock("../services/taskServices", () => ({ deleteTaskById: jest.fn(), changeTaskStatus: jest.fn() }));
 jest.mock("../services/projectServices", () => ({ addMemberToProject: jest.fn() }));
 jest.mock("../services/userServices", () => ({ getAllUsers: jest.fn() }));
+jest.mock("../services/apiClient", () => ({
+  errorMessage: (res: any, fallback: string) => res?.response?.data?.error || fallback,
+  isApiError: (res: any) => !!res && res.isAxiosError === true,
+}));
 
 const failure = { isAxiosError: true, response: { status: 403, data: { error: "Nope" } } };
-const store = () =>
-  configureStore({
-    reducer: rootReducer,
-    preloadedState: { authReducer: { myUserProfile: { _id: "me" }, isAuthenticated: true } } as any,
-  });
-const wrap = (ui: React.ReactElement) =>
-  render(
-    <Provider store={store()}>
-      <MemoryRouter>{ui}</MemoryRouter>
-    </Provider>
-  );
+const wrap = (ui: React.ReactElement) => renderWithProviders(ui, { store: makeTestStore(true, { _id: "me" }) });
 
 beforeEach(() => {
   (deleteTaskById as jest.Mock).mockReset();
@@ -62,29 +53,24 @@ describe("ChangeStatusModal", () => {
     ["To Do", "Completed"],
   ])("a %s task is changed to %s", async (from, to) => {
     (changeTaskStatus as jest.Mock).mockResolvedValue({ updateStatus: true });
-    wrap(<ChangeStatusModal activeTask={{ _id: "t1", taskStatus: from }} setTaskStatusModal={() => {}} triggerRerender={() => {}} />);
+    wrap(<ChangeStatusModal activeTask={{ _id: "t1", taskStatus: from }} setTaskStatusModal={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "Update" }));
     await waitFor(() => expect(changeTaskStatus).toHaveBeenCalledWith("t1", to));
   });
 
-  test("a failed update shows the failure and does not refresh the page data", async () => {
+  test("a failed update shows the failure", async () => {
     (changeTaskStatus as jest.Mock).mockResolvedValue(failure);
-    const triggerRerender = jest.fn();
-    wrap(<ChangeStatusModal activeTask={{ _id: "t1", taskStatus: "To Do" }} setTaskStatusModal={() => {}} triggerRerender={triggerRerender} />);
+    wrap(<ChangeStatusModal activeTask={{ _id: "t1", taskStatus: "To Do" }} setTaskStatusModal={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "Update" }));
     expect(await screen.findByText("Updation Failed")).toBeInTheDocument();
-    expect(triggerRerender).not.toHaveBeenCalled();
+    expect(screen.queryByText("Task Status Updated")).not.toBeInTheDocument();
   });
 
   test("re-rendering with a refetched task does not flip the target (the old effect did)", async () => {
     (changeTaskStatus as jest.Mock).mockResolvedValue({ updateStatus: true });
-    const props = { setTaskStatusModal: () => {}, triggerRerender: () => {} };
-    const { rerender } = render(
-      <Provider store={store()}><MemoryRouter><ChangeStatusModal activeTask={{ _id: "t1", taskStatus: "To Do" }} {...props} /></MemoryRouter></Provider>
-    );
-    rerender(
-      <Provider store={store()}><MemoryRouter><ChangeStatusModal activeTask={{ _id: "t1", taskStatus: "To Do" }} {...props} /></MemoryRouter></Provider>
-    );
+    const props = { setTaskStatusModal: () => {} };
+    const { rerender } = wrap(<ChangeStatusModal activeTask={{ _id: "t1", taskStatus: "To Do" }} {...props} />);
+    rerender(<ChangeStatusModal activeTask={{ _id: "t1", taskStatus: "To Do" }} {...props} />);
     fireEvent.click(screen.getByRole("button", { name: "Update" }));
     await waitFor(() => expect(changeTaskStatus).toHaveBeenCalledWith("t1", "Completed"));
   });
@@ -97,10 +83,7 @@ describe("AddNewMemberModal", () => {
     { _id: "u1", firstName: "Ann", lastName: "Member" },
     { _id: "u2", firstName: "Bo", lastName: "Newcomer" },
   ];
-  const renderIt = (triggerRerender = jest.fn()) => {
-    wrap(<AddNewMemberModal activeProject={project} setAddMemberModal={() => {}} triggerRerender={triggerRerender} />);
-    return triggerRerender;
-  };
+  const renderIt = () => wrap(<AddNewMemberModal activeProject={project} setAddMemberModal={() => {}} />);
   const pick = async (id: string) => {
     const select = await screen.findByRole("combobox");
     fireEvent.change(select, { target: { value: id } });
@@ -115,23 +98,22 @@ describe("AddNewMemberModal", () => {
     expect(screen.queryByRole("option", { name: "Me Self" })).not.toBeInTheDocument();
   });
 
-  test("a failed add shows failure and does not claim success or refresh", async () => {
+  test("a failed add shows failure and does not claim success", async () => {
     (getAllUsers as jest.Mock).mockResolvedValue(users);
     (addMemberToProject as jest.Mock).mockResolvedValue(failure);
-    const triggerRerender = renderIt();
+    renderIt();
     await pick("u2");
     expect(await screen.findByText("Failed To Add Member")).toBeInTheDocument();
     expect(screen.queryByText("Memeber Added to Project")).not.toBeInTheDocument();
-    expect(triggerRerender).not.toHaveBeenCalled();
   });
 
-  test("a successful add shows success and refreshes", async () => {
+  test("a successful add shows success", async () => {
     (getAllUsers as jest.Mock).mockResolvedValue(users);
     (addMemberToProject as jest.Mock).mockResolvedValue({ project: { _id: "p1" } });
-    const triggerRerender = renderIt();
+    renderIt();
     await pick("u2");
     expect(await screen.findByText("Memeber Added to Project")).toBeInTheDocument();
-    expect(triggerRerender).toHaveBeenCalled();
+    expect(addMemberToProject).toHaveBeenCalledWith("p1", { memberId: "u2" });
   });
 
   test("a failed user lookup shows an error and stops loading instead of crashing or hanging", async () => {

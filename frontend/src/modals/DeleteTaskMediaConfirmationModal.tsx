@@ -5,7 +5,7 @@ import { Close } from '@mui/icons-material'
 import { deleteMediaFromTask } from '../services/taskServices'
 
 function DeleteTaskMediaConfirmationModal(props:any) {
-    const {setDeleteTaskMediaModal,activeMedia,activeTask,triggerRerender,setViewMediaModal}=props
+    const {setDeleteTaskMediaModal,activeMedia,activeTask,setViewMediaModal}=props
     const[deleteMediaStatus,setDeleteMediaStatus]=useState<string>("not-deleted")
 
 
@@ -14,7 +14,6 @@ function DeleteTaskMediaConfirmationModal(props:any) {
       await deleteMediaFromTask(activeTask?._id,activeMedia?.mediaURL).then((res:any)=>{
         if(res?.deleteStatus){
           setDeleteMediaStatus("delete-success")
-          triggerRerender()
         }
         else{
             setDeleteMediaStatus("delete-failure")

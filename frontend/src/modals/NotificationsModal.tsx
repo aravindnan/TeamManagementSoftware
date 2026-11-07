@@ -1,85 +1,42 @@
 import { Close, DoneAll } from "@mui/icons-material";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import moment from "moment";
 import ModalOverlay from "../common/ModalOverlay";
 import NoDataMessage from "../common/NoDataMessage";
 import { describeNotification, NotificationItem } from "../helper/notifications";
-import { setUnreadAction } from "../redux/actions/notificationActions";
-import { getNotifications, markAllNotificationsRead, markNotificationRead } from "../services/notificationServices";
-import { errorMessage, isApiError } from "../services/apiClient";
+import { useNotificationList, useUnreadCount } from "../queries/hooks";
+import { qk } from "../queries/keys";
+import { adjustUnreadCount, markAllReadInCache, markReadInCache } from "../queries/notificationCache";
+import { markAllNotificationsRead, markNotificationRead } from "../services/notificationServices";
+import { errorMessage } from "../services/apiClient";
 
-const PAGE = 20;
 const initials = (name: string) =>
   name.split(/\s+/).map((p) => p[0] || "").join("").slice(0, 2).toUpperCase();
 
 function NotificationsModal({ setOpen }: { setOpen: (v: boolean) => void }) {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
-  const unread: number = useSelector((state: any) => state.notificationReducer.unread);
-
+  const client = useQueryClient();
   const [onlyUnread, setOnlyUnread] = useState(false);
-  const [items, setItems] = useState<NotificationItem[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const requestId = useRef(0);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const fetchPage = useCallback(
-    async (before?: string) => {
-      const id = ++requestId.current;
-      const res: any = await getNotifications({ limit: PAGE, unread: onlyUnread, ...(before ? { before } : {}) });
-      if (id !== requestId.current) return null; // superseded by a newer request
-      if (isApiError(res) || !Array.isArray(res?.items)) throw new Error(errorMessage(res, "Could not load notifications."));
-      return res as { items: NotificationItem[]; nextCursor: string | null; unreadCount: number };
-    },
-    [onlyUnread]
-  );
+  const list = useNotificationList(onlyUnread);
+  const { data: unread = 0 } = useUnreadCount(true);
 
-  const loadFirst = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const page = await fetchPage();
-      if (!page) return;
-      setItems(page.items);
-      setCursor(page.nextCursor);
-      dispatch(setUnreadAction(page.unreadCount));
-      setStatus("ready");
-    } catch (e: any) {
-      setError(e.message);
-      setStatus("error");
-    }
-  }, [fetchPage, dispatch]);
+  const items: NotificationItem[] = list.data?.pages.flatMap((p) => p.items as NotificationItem[]) ?? [];
+  // Rows read in this session stay hidden once the "Unread" filter is on.
+  const visible = onlyUnread ? items.filter((n) => !n.readAt) : items;
 
-  useEffect(() => {
-    loadFirst();
-  }, [loadFirst]);
-
-  const loadMore = async () => {
-    if (!cursor) return;
-    setLoadingMore(true);
-    try {
-      const page = await fetchPage(cursor);
-      if (!page) return;
-      setItems((cur) => [...cur, ...page.items]);
-      setCursor(page.nextCursor);
-    } catch (e: any) {
-      setError(e.message);
-      setStatus("error");
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
-  const open = async (n: NotificationItem) => {
-    const wasUnread = !n.readAt;
-    if (wasUnread) {
-      // Optimistic: the row and badge update immediately; the server call follows.
-      setItems((cur) => cur.map((x) => (x._id === n._id ? { ...x, readAt: new Date().toISOString() } : x)));
-      dispatch(setUnreadAction(unread - 1));
-      markNotificationRead(n._id);
+  const open = (n: NotificationItem) => {
+    if (!n.readAt) {
+      // Optimistic: row and badge update now; the server call follows and the cache reconciles afterwards.
+      markReadInCache(client, n._id);
+      adjustUnreadCount(client, -1);
+      // Not awaited: the click-through must not wait for the network. If the server refuses, resync.
+      markNotificationRead(n._id).then((res: any) => {
+        if (!res?.ok) client.invalidateQueries({ queryKey: qk.notifications });
+      });
     }
     const { to } = describeNotification(n);
     if (to) {
@@ -89,17 +46,16 @@ function NotificationsModal({ setOpen }: { setOpen: (v: boolean) => void }) {
   };
 
   const markAll = async () => {
+    markAllReadInCache(client);
+    client.setQueryData(qk.unreadCount, 0);
     const res: any = await markAllNotificationsRead();
-    if (res?.ok) {
-      setItems((cur) => cur.map((x) => (x.readAt ? x : { ...x, readAt: new Date().toISOString() })));
-      dispatch(setUnreadAction(0));
+    if (!res?.ok) {
+      setActionError(errorMessage(res, "Could not mark notifications as read."));
+      client.invalidateQueries({ queryKey: qk.notifications });
     } else {
-      setError(errorMessage(res, "Could not mark notifications as read."));
-      setStatus("error");
+      setActionError(null);
     }
   };
-
-  const visible = onlyUnread ? items.filter((n) => !n.readAt) : items;
 
   return (
     <ModalOverlay onClose={() => setOpen(false)}>
@@ -134,25 +90,31 @@ function NotificationsModal({ setOpen }: { setOpen: (v: boolean) => void }) {
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-          {status === "loading" && <div className="py-10 text-center text-[12px] text-gray-500">Loading notifications...</div>}
+        {actionError && (
+          <div role="alert" className="mb-2 rounded-[4px] bg-inactiveRed text-highPriority text-[12px] font-semibold px-2 py-1">
+            {actionError}
+          </div>
+        )}
 
-          {status === "error" && (
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+          {list.isPending && <div className="py-10 text-center text-[12px] text-gray-500">Loading notifications...</div>}
+
+          {list.isError && !list.data && (
             <div role="alert" className="flex flex-col items-center gap-2 py-10 text-[12px] text-highPriority font-semibold">
-              <div>{error}</div>
-              <button onClick={loadFirst} className="bg-[#012b39f2] hover:bg-[#012B39] rounded-[8px] text-white font-bold text-[12px] py-1 px-4">
+              <div>{errorMessage(list.error, "Could not load notifications.")}</div>
+              <button onClick={() => list.refetch()} className="bg-[#012b39f2] hover:bg-[#012B39] rounded-[8px] text-white font-bold text-[12px] py-1 px-4">
                 Retry
               </button>
             </div>
           )}
 
-          {status === "ready" && visible.length === 0 && (
+          {list.data && visible.length === 0 && (
             <div className="mt-[20%]">
               <NoDataMessage size="small" message={onlyUnread ? "You're all caught up" : "No notifications yet"} />
             </div>
           )}
 
-          {status === "ready" && (
+          {list.data && (
             <ul className="flex flex-col">
               {visible.map((n) => {
                 const t = describeNotification(n);
@@ -188,14 +150,14 @@ function NotificationsModal({ setOpen }: { setOpen: (v: boolean) => void }) {
             </ul>
           )}
 
-          {status === "ready" && cursor && (
+          {list.hasNextPage && (
             <div className="flex justify-center py-2">
               <button
-                onClick={loadMore}
-                disabled={loadingMore}
+                onClick={() => list.fetchNextPage()}
+                disabled={list.isFetchingNextPage}
                 className="bg-C44 hover:bg-[#012b3927] disabled:opacity-50 rounded-[8px] text-C11 font-bold text-[12px] py-2 px-6"
               >
-                {loadingMore ? "Loading..." : "Load older notifications"}
+                {list.isFetchingNextPage ? "Loading..." : "Load older notifications"}
               </button>
             </div>
           )}

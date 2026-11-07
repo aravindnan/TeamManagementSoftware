@@ -6,7 +6,7 @@ import { deleteMediaFromProject } from '../services/projectServices'
 
 function DeleteMediaConfirmationModal(props:any) {
 
-    const {setDeleteProjectMediaModal,activeMedia,activeProject,triggerRerender,setViewMediaModal}=props
+    const {setDeleteProjectMediaModal,activeMedia,activeProject,setViewMediaModal}=props
     const[deleteMediaStatus,setDeleteMediaStatus]=useState<string>("not-deleted")
 
 
@@ -16,7 +16,6 @@ function DeleteMediaConfirmationModal(props:any) {
       await deleteMediaFromProject(activeProject?._id,activeMedia?.mediaURL).then((res:any)=>{
         if(res?.deleteStatus){
           setDeleteMediaStatus("delete-success")
-          triggerRerender()
         }
         else{
             setDeleteMediaStatus("delete-failure")

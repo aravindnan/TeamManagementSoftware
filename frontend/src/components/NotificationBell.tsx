@@ -2,12 +2,15 @@ import { NotificationsNone } from "@mui/icons-material";
 import React, { useState } from "react";
 import { useSelector } from "react-redux";
 import { colors } from "../Constants";
+import { useUnreadCount } from "../queries/hooks";
 import { badgeText } from "../helper/notifications";
 import NotificationsModal from "../modals/NotificationsModal";
 
 /** Bell with an unread badge. Opens the inbox. Used by both the sidebar and the mobile top bar. */
 function NotificationBell() {
-  const unread: number = useSelector((state: any) => state.notificationReducer.unread);
+  const signedIn = useSelector((state: any) => state.authReducer.isAuthenticated);
+  // One shared query: the sidebar and the mobile top bar both mount a bell, but there is a single request.
+  const { data: unread = 0 } = useUnreadCount(signedIn);
   const [open, setOpen] = useState(false);
 
   return (

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import ProjectPageProjectInfo from "../components/ProjectPageProjectInfo";
 import ProjectPageMyTasks from "../components/ProjectPageMyTasks";
 import ProjectPageProjectMembers from "../components/ProjectPageProjectMembers";
@@ -16,17 +16,18 @@ import AddNewMemberModal from "../modals/AddNewMemberModal";
 import DeleteProjectConfirmationModal from "../modals/DeleteProjectConfirmationModal";
 import ProjectPageAddMediaModal from "../modals/ProjectPageAddMediaModal";
 import ViewMediaModal from "../modals/ViewMediaModal";
-import { getProjectById } from "../services/projectServices";
-import { useDispatch, useSelector } from "react-redux";
-import { getMe } from "../services/authServices";
-import * as authActions from "../redux/actions/authActions"
-import { useNavigate } from "react-router";
+import { useSelector } from "react-redux";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useProject, useRequireMe } from "../queries/hooks";
 import TopBar from "../components/TopBar";
 
 
 import ProjectPageDiscussion from "../components/ProjectPageDiscussion";
 import APIResponseStatus from "../common/APIResponseStatus";
 
+
+// Stable empty value while the project loads, so memo/effect dependencies do not churn.
+const NO_PROJECT = {};
 
 function ProjectPage() {
   const [addTaskModal,setAddTaskModal]=useState<Boolean>(false)
@@ -41,92 +42,38 @@ function ProjectPage() {
   const [addMemberModal,setAddMemberModal] = useState<Boolean>(false)
   const [deleteProjectModal,setDeleteProjetModal] = useState<Boolean>(false)
   const [addMediaModal,setAddMediaModal] = useState<Boolean>(false)
-  const [activeProject,setActiveProject] =  useState<any>({})
-  const [rerender, setRerender] = useState(false);
   const [myTasks,setMytasks] = useState<any>([])
-  const [completedTasks,setCompletedTasks] = useState<any>([])
-  const [networkError,setNetworkError] = useState<Boolean>(false)
-  const [pageLoading, setPageLoading] = useState<any>("not-loaded")
+
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const projectId = searchParams.get("id")
+
+  // Both reads come from the shared query cache: opening a project you have just seen is instant,
+  // and every write (a comment, a status change, a new member...) refreshes exactly what it affected.
+  useRequireMe() // redirects signed-out visitors and keeps the Redux copy of the profile current
+  const projectQuery = useProject(projectId)
+  const activeProject: any = projectQuery.data ?? NO_PROJECT
+  const networkError = (projectQuery.error as any)?.code === "ERR_NETWORK"
+  const pageLoading = projectQuery.data ? "loaded" : projectQuery.isError ? "error" : "not-loaded"
 
   const myProfiledata = useSelector(
     (state: any) => state.authReducer.myUserProfile
   );
 
-  
-  
   const isCurrentUserInProject = activeProject?.projectMembers?.some((member:any) => member._id === myProfiledata?._id);
-  
-  const navigate = useNavigate()
-  
-  
-  
-  useEffect(()=>{
-    Object.keys(activeProject).length!==0?
-    window.document.title = activeProject?.projectName:window.document.title ="TMS"
-  },[activeProject])
-  
 
   useEffect(() => {
-    const projectId = new URLSearchParams(window.location.search).get("id");
-    if (!projectId) {
-      navigate("/not-found", { replace: true })
-      return
-    }
-    let cancelled = false
-    ;(async () => {
-      const res: any = await getProjectById(projectId)
-      if (cancelled) return
-      if (res?._id) {
-        setPageLoading("loaded")
-        setActiveProject(res)
-      } else {
-        setNetworkError(res?.code === "ERR_NETWORK")
-        setPageLoading("error")
-      }
-    })()
-    return () => { cancelled = true }
-  }, [rerender, navigate]);
+    if (!projectId) navigate("/not-found", { replace: true })
+  }, [projectId, navigate])
 
+  useEffect(() => {
+    document.title = projectQuery.data?.projectName ?? "TMS"
+  }, [projectQuery.data?.projectName])
 
-
-
-  const triggerRerender = () => {
-    setRerender((prev) => !prev);
-  };
-
-  useEffect(()=>{
-    if (activeProject?.allTasks) {
-      const tasks = activeProject.allTasks;
-
-      const completed = tasks.filter((task: any) => task.taskStatus === 'Completed');
-
-      setCompletedTasks(completed);
-    }
-
-  },[activeProject])
-
-
-
-
-  // const activeProject = useSelector(
-  //   (state: any) => state.projectReducer.activeProject
-  // );
-const dispatch = useDispatch()
-useEffect(() => {
-  let cancelled = false
-  ;(async () => {
-    const res: any = await getMe()
-    if (cancelled) return
-    if (res === null) {
-      navigate("/login")
-    } else if (res?._id) {
-      dispatch(authActions.loginAction(res))
-    } else {
-      setNetworkError(res?.code === "ERR_NETWORK")
-    }
-  })()
-  return () => { cancelled = true }
-}, [navigate, dispatch]);
+  const completedTasks = useMemo(
+    () => (activeProject?.allTasks || []).filter((task: any) => task.taskStatus === "Completed"),
+    [activeProject]
+  )
 
   return (
     <>{
@@ -185,7 +132,6 @@ useEffect(() => {
         <ProjectPageDiscussion
         myProfiledata={myProfiledata}
         activeProject={activeProject} 
-        triggerRerender={triggerRerender}
         />
 
 
@@ -200,7 +146,6 @@ useEffect(() => {
     //  Add New Task to project modal
      addTaskModal?
      <AddNewTaskModal 
-     triggerRerender={triggerRerender} // Pass the function here
      activeProject={activeProject} 
      setAddTaskModal={setAddTaskModal}
      />:null
@@ -218,7 +163,6 @@ useEffect(() => {
       activeProject={activeProject}
       myProfiledata={myProfiledata}
       setBoardModal={setBoardModal}
-      triggerRerender={triggerRerender}
       />:null
      }
      {
@@ -228,14 +172,12 @@ useEffect(() => {
 
       activeProject={activeProject} 
       setViewAllTaskModal = {setViewAllTaskModal} 
-      triggerRerender={triggerRerender}
       />:null
      }
      {
       // Show user profile modal
       userProfileModal?
       <UserProfileModal
-      triggerRerender={triggerRerender} // Pass the function here
       setUserProfileModal={setUserProfileModal}
       />:null
      }
@@ -245,7 +187,6 @@ useEffect(() => {
         <RemoveMemberConfirmationModal
         memberData={removeMemberModal.memberData}
         activeProject={activeProject}
-        triggerRerender={triggerRerender} // Pass the function here
         setRemoveMemberModal={setRemoveMemberModal}
         />
         :null
@@ -263,7 +204,6 @@ useEffect(() => {
       viewMediaModal.isOpen?
           <ViewMediaModal
           type="project"
-          triggerRerender={triggerRerender}
           activeProject={activeProject}
           mediaData={viewMediaModal.mediaData}
           setViewMediaModal={setViewMediaModal}
@@ -274,7 +214,6 @@ useEffect(() => {
       {
         editProjectInfoModal?
         <EditProjectInfoModal
-        triggerRerender={triggerRerender} // Pass the function here
         activeProject={activeProject}
         setEditProjectInfoModal={setEditProjectInfoModal}
         />:null
@@ -284,7 +223,6 @@ useEffect(() => {
         addMemberModal?
         <AddNewMemberModal
         activeProject={activeProject}
-        triggerRerender={triggerRerender} // Pass the function here
         setAddMemberModal={setAddMemberModal}
         />:null
       }
@@ -299,7 +237,6 @@ useEffect(() => {
         addMediaModal?
           <ProjectPageAddMediaModal
           activeProject={activeProject}
-          triggerRerender={triggerRerender} // Pass the function here
           setAddMediaModal={setAddMediaModal} 
           />:null
       }

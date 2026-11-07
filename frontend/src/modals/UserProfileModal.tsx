@@ -13,7 +13,7 @@ function UserProfileModal(props:any) {
     (state: any) => state.authReducer.myUserProfile
   );
 
-    const {setUserProfileModal,triggerRerender}=props
+    const {setUserProfileModal}=props
     const [editState,setEditState] = useState<Boolean>(false)
     const [error, setError] = useState<string | null>(null);
     const [editProfileStatus,setEditProfileStatus] = useState<string>("not-edited")
@@ -78,7 +78,6 @@ function UserProfileModal(props:any) {
           .then((res: any) => {
             if(res.updateStatus){
               setEditProfileStatus("edit-success");
-              triggerRerender()
             }
             else{
               setEditProfileStatus("edit-failure");

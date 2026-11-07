@@ -4,7 +4,8 @@ import { colors } from "../Constants";
 import { Link, useNavigate } from "react-router-dom";
 import {Visibility, VisibilityOff } from "@mui/icons-material";
 import ErrorBox from "../common/ErrorBox";
-import { getMe, loginUser } from "../services/authServices";
+import { loginUser } from "../services/authServices";
+import { useMe } from "../queries/hooks";
 import { errorMessage } from "../services/apiClient";
 import APIResponseStatus from "../common/APIResponseStatus";
 import { Tooltip } from "@mui/material";
@@ -23,13 +24,14 @@ function Login() {
     setLoginStatus("not-loggedin")
   }
 
+  // Already signed in? Skip the form.
+  const { data: me } = useMe();
   useEffect(() => {
     document.title = "TMS • Log In";
-    // Already signed in? Skip the form.
-    getMe().then((me: any) => {
-      if (me?._id) navigate("/dashboard");
-    });
-  }, [navigate]);
+  }, []);
+  useEffect(() => {
+    if (me) navigate("/dashboard");
+  }, [me, navigate]);
 
 //   const getMyProfileData =async(myUserId:any)=>{
 //     const tempOBJ = await getUserById(myUserId)

@@ -7,14 +7,15 @@ import {
   Group,
   Refresh,
 } from "@mui/icons-material";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import moment from "moment";
 import ModalOverlay from "../common/ModalOverlay";
 import NoDataMessage from "../common/NoDataMessage";
 import { ActivityItem, describeActivity, groupByDay } from "../helper/activity";
-import { ActivityCategory, getProjectActivity } from "../services/projectServices";
-import { errorMessage, isApiError } from "../services/apiClient";
+import type { ActivityCategory } from "../services/projectServices";
+import { useProjectActivity } from "../queries/hooks";
+import { errorMessage } from "../services/apiClient";
 
 const FILTERS: { key: ActivityCategory | "all"; label: string }[] = [
   { key: "all", label: "All" },
@@ -33,7 +34,6 @@ const ICON: Record<string, React.ReactElement> = {
   project: <Folder sx={{ fontSize: 14 }} />,
 };
 
-const PAGE = 20;
 const initials = (name: string) =>
   name
     .split(/\s+/)
@@ -44,62 +44,12 @@ const initials = (name: string) =>
 
 function ActivityModal({ activeProject, setActivityModal }: any) {
   const [filter, setFilter] = useState<ActivityCategory | "all">("all");
-  const [items, setItems] = useState<ActivityItem[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const requestId = useRef(0); // ignores responses that arrive after the filter changed
 
-  const fetchPage = useCallback(
-    async (before?: string) => {
-      const id = ++requestId.current;
-      const res: any = await getProjectActivity(activeProject._id, {
-        limit: PAGE,
-        ...(before ? { before } : {}),
-        ...(filter !== "all" ? { category: filter } : {}),
-      });
-      if (id !== requestId.current) return null;
-      if (isApiError(res) || !Array.isArray(res?.items)) throw new Error(errorMessage(res, "Could not load activity."));
-      return res as { items: ActivityItem[]; nextCursor: string | null };
-    },
-    [activeProject._id, filter]
-  );
-
-  const loadFirst = useCallback(async () => {
-    setStatus("loading");
-    try {
-      const page = await fetchPage();
-      if (!page) return;
-      setItems(page.items);
-      setCursor(page.nextCursor);
-      setStatus("ready");
-    } catch (e: any) {
-      setError(e.message);
-      setStatus("error");
-    }
-  }, [fetchPage]);
-
-  useEffect(() => {
-    loadFirst();
-  }, [loadFirst]);
-
-  const loadMore = async () => {
-    if (!cursor) return;
-    setLoadingMore(true);
-    try {
-      const page = await fetchPage(cursor);
-      if (!page) return;
-      setItems((cur) => [...cur, ...page.items]);
-      setCursor(page.nextCursor);
-    } catch (e: any) {
-      setError(e.message);
-      setStatus("error");
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
+  // Each filter is its own cached feed, so flipping back to one you have seen is instant.
+  const feed = useProjectActivity(activeProject._id, filter);
+  const items: ActivityItem[] = feed.data?.pages.flatMap((p) => p.items as ActivityItem[]) ?? [];
+  const status: "loading" | "ready" | "error" = feed.data ? "ready" : feed.isError ? "error" : "loading";
+  const error = feed.isError ? errorMessage(feed.error, "Could not load activity.") : null;
   const groups = groupByDay(items);
 
   return (
@@ -108,7 +58,7 @@ function ActivityModal({ activeProject, setActivityModal }: any) {
         <div className="flex flex-row items-center justify-between pb-2">
           <div className="font-bold text-[20px] text-C11">{`${activeProject?.projectName || "Project"} · Activity`}</div>
           <div className="flex flex-row items-center gap-3">
-            <button className="cursor-pointer" onClick={loadFirst} aria-label="Refresh activity">
+            <button className="cursor-pointer" onClick={() => feed.refetch()} aria-label="Refresh activity">
               <Refresh sx={{ fontSize: 20 }} />
             </button>
             <button className="cursor-pointer" onClick={() => setActivityModal(false)} aria-label="Close">
@@ -136,7 +86,7 @@ function ActivityModal({ activeProject, setActivityModal }: any) {
           {status === "error" && (
             <div role="alert" className="flex flex-col items-center gap-2 py-10 text-[12px] text-highPriority font-semibold">
               <div>{error}</div>
-              <button onClick={loadFirst} className="bg-[#012b39f2] hover:bg-[#012B39] rounded-[8px] text-white font-bold text-[12px] py-1 px-4">
+              <button onClick={() => feed.refetch()} className="bg-[#012b39f2] hover:bg-[#012B39] rounded-[8px] text-white font-bold text-[12px] py-1 px-4">
                 Retry
               </button>
             </div>
@@ -197,14 +147,14 @@ function ActivityModal({ activeProject, setActivityModal }: any) {
               </section>
             ))}
 
-          {status === "ready" && cursor && (
+          {status === "ready" && feed.hasNextPage && (
             <div className="flex justify-center py-2">
               <button
-                onClick={loadMore}
-                disabled={loadingMore}
+                onClick={() => feed.fetchNextPage()}
+                disabled={feed.isFetchingNextPage}
                 className="bg-C44 hover:bg-[#012b3927] disabled:opacity-50 rounded-[8px] text-C11 font-bold text-[12px] py-2 px-6"
               >
-                {loadingMore ? "Loading..." : "Load older activity"}
+                {feed.isFetchingNextPage ? "Loading..." : "Load older activity"}
               </button>
             </div>
           )}

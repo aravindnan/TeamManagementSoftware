@@ -9,7 +9,7 @@ import { errorMessage } from '../services/apiClient';
 import { acceptedFileTypes } from '../Constants';
 
 function TaskPageAddMediaModal(props:any) {
-  const { setAddMediaModal, activeTask, triggerRerender } = props;
+  const { setAddMediaModal, activeTask } = props;
   const fileInputRef = useRef<any>(null);
   const [fileList, setFileList] = useState<any>([]);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +53,6 @@ function TaskPageAddMediaModal(props:any) {
       if (res?.addSuccess) {
         setFileList([]);
         setAddMediaModal(false);
-        triggerRerender();
       } else {
         setError(errorMessage(res, "Could not attach the media to the task"));
       }

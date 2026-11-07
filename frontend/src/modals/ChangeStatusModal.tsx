@@ -5,7 +5,7 @@ import { Close } from '@mui/icons-material'
 import { changeTaskStatus } from '../services/taskServices'
 
 function ChangeStatusModal(props:any) {
-    const {setTaskStatusModal,activeTask,triggerRerender}=props
+    const {setTaskStatusModal,activeTask}=props
     const[updateTaskStatus,setUpdateTaskStatus]=useState<string>("not-updated")
     // Completed tasks are reopened; anything still open is completed.
     const targetStatus = activeTask?.taskStatus === "Completed" ? "In Progress" : "Completed"
@@ -16,7 +16,6 @@ function ChangeStatusModal(props:any) {
       const res: any = await changeTaskStatus(activeTask?._id,targetStatus)
       if (res?.updateStatus) {
         setUpdateTaskStatus("update-success")
-        triggerRerender()
       } else {
         setUpdateTaskStatus("update-failure")
       }

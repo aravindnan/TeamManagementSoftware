@@ -1,61 +1,26 @@
 import { Close } from "@mui/icons-material";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import ModalOverlay from "../common/ModalOverlay";
 import KanbanBoard from "../components/KanbanBoard";
 import RiskRadar from "../components/RiskRadar";
 import InsightsPanel from "../components/InsightsPanel";
-import { getProjectAnalytics, getProjectRisk } from "../services/projectServices";
-import { errorMessage, isApiError } from "../services/apiClient";
+import { useProjectAnalytics, useProjectRisk } from "../queries/hooks";
+import { errorMessage } from "../services/apiClient";
 
 type View = "board" | "radar" | "insights";
 
 function BoardModal(props: any) {
-  const { activeProject, myProfiledata, setBoardModal, triggerRerender } = props;
-  const changed = useRef(false);
+  const { activeProject, myProfiledata, setBoardModal } = props;
   const [view, setView] = useState<View>("board");
-  const [risk, setRisk] = useState<any | null>(null);
-  const [riskError, setRiskError] = useState<string | null>(null);
-  const [insights, setInsights] = useState<any | null>(null);
-  const [insightsError, setInsightsError] = useState<string | null>(null);
-  // Bumped on every card move so the (lazily loaded) insights are refreshed the next time they are opened.
-  const [version, setVersion] = useState(0);
-  const loadedVersion = useRef(-1);
 
-  const loadRisk = useCallback(async () => {
-    const res: any = await getProjectRisk(activeProject?._id);
-    if (isApiError(res) || !res?.summary) {
-      setRiskError(errorMessage(res, "Could not analyse deadlines."));
-    } else {
-      setRisk(res);
-      setRiskError(null);
-    }
-  }, [activeProject?._id]);
+  // Both views are cached queries under the project's key, so any change to the project (a card move,
+  // a new task...) marks them stale and the visible one refreshes by itself. Insights loads on first open.
+  const riskQuery = useProjectRisk(activeProject._id);
+  const insightsQuery = useProjectAnalytics(activeProject._id, view === "insights");
 
-  useEffect(() => {
-    loadRisk();
-  }, [loadRisk]);
-
-  const loadInsights = useCallback(async () => {
-    loadedVersion.current = version;
-    const res: any = await getProjectAnalytics(activeProject?._id);
-    if (isApiError(res) || !res?.summary) {
-      loadedVersion.current = -1; // allow a retry
-      setInsightsError(errorMessage(res, "Could not load insights."));
-    } else {
-      setInsights(res);
-      setInsightsError(null);
-    }
-  }, [activeProject?._id, version]);
-
-  useEffect(() => {
-    if (view === "insights" && loadedVersion.current !== version) loadInsights();
-  }, [view, version, loadInsights]);
-
-  // The page's own task lists are refreshed once, when the modal closes (moves are already optimistic here).
-  const close = () => {
-    setBoardModal(false);
-    if (changed.current) triggerRerender();
-  };
+  const risk = riskQuery.data ?? null;
+  const riskError = riskQuery.isError && !risk ? errorMessage(riskQuery.error, "Could not analyse deadlines.") : null;
+  const insightsError = insightsQuery.isError && !insightsQuery.data ? errorMessage(insightsQuery.error, "Could not load insights.") : null;
 
   const riskByTask = Object.fromEntries((risk?.tasks || []).map((t: any) => [t.taskId, t]));
   const atRiskCount = risk ? risk.summary.high + risk.summary.medium : 0;
@@ -75,11 +40,11 @@ function BoardModal(props: any) {
   );
 
   return (
-    <ModalOverlay onClose={close}>
+    <ModalOverlay onClose={() => setBoardModal(false)}>
       <div className="bg-C55 rounded-[8px] p-5 w-[95%] max-w-[1200px] h-[85vh] flex flex-col shadow-xl text-C11">
         <div className="flex flex-row items-center justify-between pb-2">
           <div className="font-bold text-[20px] text-C11">{`${activeProject?.projectName || "Project"} · Board`}</div>
-          <button className="cursor-pointer" onClick={close} aria-label="Close">
+          <button className="cursor-pointer" onClick={() => setBoardModal(false)} aria-label="Close">
             <Close sx={{ fontSize: 20, fontWeight: 800 }} />
           </button>
         </div>
@@ -90,24 +55,15 @@ function BoardModal(props: any) {
           {tab("insights", "Insights")}
         </div>
 
-        {/* Both panels stay mounted so optimistic board state survives switching tabs. */}
+        {/* All panels stay mounted so scroll position and the open tab survive switching. */}
         <div id="panel-board" role="tabpanel" aria-labelledby="tab-board" className={view === "board" ? "flex flex-col flex-1 min-h-0" : "hidden"}>
-          <KanbanBoard
-            project={activeProject}
-            me={myProfiledata}
-            riskByTask={riskByTask}
-            onChanged={() => {
-              changed.current = true;
-              loadRisk(); // a move changes the risk picture
-              setVersion((v) => v + 1);
-            }}
-          />
+          <KanbanBoard project={activeProject} me={myProfiledata} riskByTask={riskByTask} />
         </div>
         <div id="panel-radar" role="tabpanel" aria-labelledby="tab-radar" className={view === "radar" ? "flex flex-col flex-1 min-h-0" : "hidden"}>
-          <RiskRadar risk={risk} error={riskError} project={activeProject} onRetry={loadRisk} />
+          <RiskRadar risk={risk} error={riskError} project={activeProject} onRetry={() => riskQuery.refetch()} />
         </div>
         <div id="panel-insights" role="tabpanel" aria-labelledby="tab-insights" className={view === "insights" ? "flex flex-col flex-1 min-h-0" : "hidden"}>
-          <InsightsPanel data={insights} error={insightsError} project={activeProject} onRetry={loadInsights} />
+          <InsightsPanel data={insightsQuery.data ?? null} error={insightsError} project={activeProject} onRetry={() => insightsQuery.refetch()} />
         </div>
       </div>
     </ModalOverlay>

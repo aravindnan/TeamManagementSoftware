@@ -5,7 +5,7 @@ import ModalOverlay from '../common/ModalOverlay';
 import DeleteMediaConfirmationModal from "./DeleteMediaConfirmationModal";
 import DeleteTaskMediaConfirmationModal from "./DeleteTaskMediaConfirmationModal";
 function ViewMediaModal(props: any) {
-  const { setViewMediaModal, mediaData,activeProject,triggerRerender,activeTask,type } = props;
+  const { setViewMediaModal, mediaData,activeProject,activeTask,type } = props;
   const [deleteProjectMediaModal,setDeleteProjectMediaModal]=useState<any>({isOpen: false, mediaData: null})
   const [deleteTaskMediaModal,setDeleteTaskMediaModal]=useState<any>({isOpen: false, mediaData: null})
 
@@ -111,7 +111,6 @@ function ViewMediaModal(props: any) {
       activeMedia= {deleteProjectMediaModal?.mediaData}
       setDeleteProjectMediaModal={setDeleteProjectMediaModal}
       activeProject={activeProject}
-      triggerRerender={triggerRerender}
       />
       }
       {
@@ -121,7 +120,6 @@ function ViewMediaModal(props: any) {
       setViewMediaModal={setViewMediaModal}
       activeMedia= {deleteTaskMediaModal?.mediaData}
       setDeleteTaskMediaModal={setDeleteTaskMediaModal}
-      triggerRerender={triggerRerender}
       />
       }
       </div>

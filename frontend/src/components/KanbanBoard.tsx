@@ -1,4 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { qk } from "../queries/keys";
 import { Link } from "react-router-dom";
 import moment from "moment";
 import { TASK_STATUSES, TaskStatus } from "../Constants";
@@ -24,12 +26,13 @@ interface Props {
   me: any;
   /** Deadline risk per task id (from the risk radar); optional. */
   riskByTask?: Record<string, { level: any; reasons: string[] }>;
-  /** Called after a move has been saved on the server. */
-  onChanged: () => void;
 }
 
-function KanbanBoard({ project, me, riskByTask = {}, onChanged }: Props) {
-  const [tasks, setTasks] = useState<any[]>(project?.allTasks || []);
+function KanbanBoard({ project, me, riskByTask = {} }: Props) {
+  const client = useQueryClient();
+  // The tasks live in the project's cache entry (the page behind this dialog reads the same one),
+  // so a move shows up everywhere instantly and a rollback undoes it everywhere.
+  const tasks: any[] = useMemo(() => project?.allTasks || [], [project?.allTasks]);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overColumn, setOverColumn] = useState<TaskStatus | null>(null);
   const [onlyMine, setOnlyMine] = useState(false);
@@ -63,13 +66,16 @@ function KanbanBoard({ project, me, riskByTask = {}, onChanged }: Props) {
       return;
     }
     const from = task.taskStatus;
-    setTasks((cur) => withStatus(cur, taskId, to)); // optimistic
+    const key = qk.project(project._id);
+    const setStatus = (status: TaskStatus) =>
+      client.setQueryData(key, (old: any) => (old ? { ...old, allTasks: withStatus(old.allTasks, taskId, status) } : old));
+
+    await client.cancelQueries({ queryKey: key }); // an in-flight refetch must not overwrite the optimistic state
+    setStatus(to);
     setAnnounce(`Moved ${task.taskTitle} to ${to}`);
-    const res: any = await changeTaskStatus(taskId, to);
-    if (res?.updateStatus) {
-      onChanged();
-    } else {
-      setTasks((cur) => withStatus(cur, taskId, from)); // roll back just this task
+    const res: any = await changeTaskStatus(taskId, to); // on success the cache layer refreshes everything affected
+    if (!res?.updateStatus) {
+      setStatus(from); // roll back just this task
       setAnnounce(`Could not move ${task.taskTitle}`);
       showError(errorMessage(res, "Could not move the task. It was put back."));
     }

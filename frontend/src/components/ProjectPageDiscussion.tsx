@@ -11,7 +11,7 @@ function ProjectPageDiscussion(props:any) {
    
 
 
-    const {activeProject,myProfiledata,triggerRerender}=props
+    const {activeProject,myProfiledata}=props
     const [postCommentStatus, setPostCommentStatus] = useState<string>("not-posted");
     const [error, setError] = useState<string | null>(null);
     const commentsContainerRef = useRef<HTMLDivElement>(null);
@@ -52,7 +52,6 @@ function ProjectPageDiscussion(props:any) {
         if (res?.addStatus) {
           setPostCommentStatus("not-posted");
           setProjectCommentFormData(emptyState);
-          triggerRerender();
         } else {
           setError(errorMessage(res, "Comment Could Not be Posted"));
           setPostCommentStatus("post-failure");

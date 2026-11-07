@@ -15,6 +15,16 @@ Collaborative task management: projects, members, tasks with priorities and due 
 - **Notifications and Inbox**: assignees, task creators and affected members are notified (never the person who acted). Bell with unread badge in both nav bars, an inbox modal with read/unread, mark-all-read, pagination and click-through to the task. One shared 30 s poller (paused when the tab is hidden). Inboxes are strictly per-user. See `backend/utils/activity.js` for the recipient rules.
 - **Flow insights** (Board → Insights): median and 85th-percentile cycle time, tasks completed per week, a created-vs-completed burn-up, the work that has sat longest in a column (flagged when slower than 85% of finished tasks), and per-person figures that only the project manager sees. Inline SVG charts with text alternatives. Calculations are pure functions in `backend/utils/analytics.js`.
 
+## Frontend data layer
+
+Server data is cached with TanStack Query (`frontend/src/queries/`):
+
+- **Reads** are hooks (`useMe`, `useProject`, `useTask`, `useProjectRisk`, `useProjectActivity`, `useUnreadCount`, ...). Opening something you have just seen is instant, simultaneous requests for the same data are shared, and stale data is shown while a fresh copy loads.
+- **Writes never coordinate refreshes by hand.** `queries/invalidation.ts` is a single declarative table saying which cached data each successful request makes stale; the HTTP layer applies it. New comments are patched straight into the cache; everything else refetches only what is on screen.
+- Kanban moves are optimistic updates on the cache with per-task rollback; the inbox is optimistic too.
+- The cache is cleared on login, logout and any 401, so one user's data can never reach the next.
+- Failed requests are retried only when a retry could help (network errors and 5xx, at most twice).
+
 ## Run locally
 
 ```bash

@@ -17,7 +17,7 @@ import { errorMessage } from "../services/apiClient";
 import { acceptedFileTypes } from "../Constants";
 
 function ProjectPageAddMediaModal(props: any) {
-  const { setAddMediaModal, activeProject, triggerRerender } = props;
+  const { setAddMediaModal, activeProject } = props;
   const fileInputRef = useRef<any>(null);
   const [fileList, setFileList] = useState<any>([]);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +61,6 @@ function ProjectPageAddMediaModal(props: any) {
       if (res?.addSuccess) {
         setFileList([]);
         setAddMediaModal(false);
-        triggerRerender();
       } else {
         setError(errorMessage(res, "Could not attach the media to the project"));
       }

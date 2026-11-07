@@ -2,6 +2,8 @@ import axios, { AxiosResponse } from "axios";
 import { ENV } from "../env/environment";
 import { store } from "../redux/store";
 import { logoutAction } from "../redux/actions/authActions";
+import { queryClient } from "../queries/queryClient";
+import { applyMutationEffects } from "../queries/invalidation";
 
 // One axios instance for the whole app. The session lives in an httpOnly cookie set by the API,
 // so every request just has to send credentials.
@@ -10,7 +12,11 @@ export const api = axios.create({ baseURL: ENV, withCredentials: true, timeout: 
 const PUBLIC_PATHS = ["/", "/login", "/register"];
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Keep cached reads honest: every successful write says which cached data it made stale.
+    applyMutationEffects(queryClient, response.config.method, response.config.url, response.data);
+    return response;
+  },
   (error) => {
     const status = error?.response?.status;
     const url: string = error?.config?.url || "";
@@ -18,6 +24,7 @@ api.interceptors.response.use(
     // Session expired or revoked: clear client state and send the user to log in.
     if (status === 401 && !isAuthCall) {
       store.dispatch(logoutAction());
+      queryClient.clear(); // never keep one session's data around after it ends
       if (!PUBLIC_PATHS.includes(window.location.pathname)) window.location.assign("/login");
     }
     return Promise.reject(error);

@@ -1,17 +1,15 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import ModalOverlay from '../common/ModalOverlay';
 import { Close } from "@mui/icons-material";
 import ErrorBox from "../common/ErrorBox";
-import { getAllUsers } from "../services/userServices";
+import { useUserDirectory } from "../queries/hooks";
 import APIResponseStatus from "../common/APIResponseStatus";
 import { addMemberToProject } from "../services/projectServices";
 import { useSelector } from "react-redux";
 
 function AddNewMemberModal(props: any) {
-  const { setAddMemberModal ,triggerRerender,activeProject} = props;
+  const { setAddMemberModal ,activeProject} = props;
   const [error, setError] = useState<any>();
-  const [allUsers, setAllUsers] = useState<any>([]);
-  const [loading,setLoading] = useState<Boolean>(true)
   const [addNewMemberStatus,setAddNewMemberStatus] = useState<string>("not-added")
 
   const myProfiledata = useSelector(
@@ -28,26 +26,19 @@ function AddNewMemberModal(props: any) {
   }, [error]);
 
   // People who can still be added: everyone except those already on the project.
+  const directory = useUserDirectory()
   const memberIds = (activeProject?.projectMembers || []).map((m: any) => m._id)
   const memberKey = memberIds.join(",")
-
-  const getUsers = useCallback(async () => {
-    const res: any = await getAllUsers()
-    if (Array.isArray(res)) {
-      setAllUsers(res.filter((user: any) => user._id !== myProfiledata?._id && !memberKey.split(",").includes(user._id)))
-    } else {
-      setError("Could not load users. Please try again.")
-    }
-    setLoading(false) // also when the list is empty or the request failed, so the modal never hangs
-  }, [myProfiledata?._id, memberKey])
+  const allUsers: any[] = useMemo(
+    () => (directory.data || []).filter((user: any) => user._id !== myProfiledata?._id && !memberKey.split(",").includes(user._id)),
+    [directory.data, myProfiledata?._id, memberKey]
+  )
+  const loading = directory.isPending
 
   useEffect(() => {
-    setLoading(true)
-    getUsers()
-  }, [getUsers])
+    if (directory.isError) setError("Could not load users. Please try again.")
+  }, [directory.isError])
 
-  
-  
   const emptyState = {
     memberId: "",
   };
@@ -77,7 +68,6 @@ function AddNewMemberModal(props: any) {
       setAddNewMemberStatus("add-loading")
       const res: any = await addMemberToProject(activeProject?._id,addMemberFormData)
       if (res?.project?._id) {
-        triggerRerender()
         setAddMemberFormData(emptyState)
         setAddNewMemberStatus("add-success")
       } else {

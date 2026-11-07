@@ -1,18 +1,12 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { Link } from 'react-router-dom'
 import Logo from '../common/Logo'
 import { colors } from '../Constants'
-import { getMe } from '../services/authServices'
+import { useMe } from '../queries/hooks'
 
 function HomePage() {
     document.title="TMS • Home"
-    const [userData, setUserData]= useState<any>()
-
-    useEffect(()=>{
-        getMe().then((me:any)=>{
-            if (me?._id) setUserData(me)
-        })
-    },[])
+    const { data: userData } = useMe()
 
 
   return (

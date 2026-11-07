@@ -6,7 +6,7 @@ import { editProjectById } from "../services/projectServices";
 import APIResponseStatus from "../common/APIResponseStatus";
 
 function EditProjectInfoModal(props: any) {
-  const { setEditProjectInfoModal,activeProject ,triggerRerender} = props;
+  const { setEditProjectInfoModal,activeProject } = props;
   const [error, setError] = useState<string | null>(null);
   const [editProjectStatus,setEditProjectStatus] = useState<string>("not-edited")
 
@@ -62,7 +62,6 @@ function EditProjectInfoModal(props: any) {
       const res: any = await editProjectById(activeProject?._id,editProjectFormData)
       if (res?.status) {
         setEditProjectStatus("edit-success")
-        triggerRerender()
         setEditProjectFormData(emptyState)
       } else {
         setEditProjectStatus("edit-failure")

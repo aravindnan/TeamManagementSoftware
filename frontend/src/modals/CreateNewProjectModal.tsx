@@ -8,7 +8,7 @@ import APIResponseStatus from "../common/APIResponseStatus";
 import { Link } from "react-router-dom";
 
 function CreateNewProjectModal(props: any) {
-  const { setCreateNewProjectModal,triggerRerender} = props;
+  const { setCreateNewProjectModal} = props;
   const [error, setError] = useState<string | null>(null);
   const [createProjectStatus,setCreateProjectStatus] = useState<any>("not-created")
   const [createdProjectId,setCreatedProjectId] = useState<any>(null)
@@ -70,7 +70,6 @@ function CreateNewProjectModal(props: any) {
         setCreateProjectFormData(emptyState)
         setCreateProjectStatus("create-success")
         setCreatedProjectId(res.project._id);
-        triggerRerender()
       } else {
         setCreateProjectStatus("create-failure")
         setApiResponseMessage(errorMessage(res, "Could not create the project"))

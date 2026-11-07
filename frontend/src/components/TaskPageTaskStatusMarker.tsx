@@ -8,7 +8,7 @@ import { errorMessage } from "../services/apiClient";
 import moment from "moment";
 
 function TaskPageTaskStatusMarker(props: any) {
-  const { activeTask, myProfiledata, setTaskStatusModal, triggerRerender } =
+  const { activeTask, myProfiledata, setTaskStatusModal } =
     props;
     const commentsContainerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +50,6 @@ function TaskPageTaskStatusMarker(props: any) {
     if (res?.addStatus) {
       setPostCommentStatus("not-posted");
       setTaskCommentFormData(emptyState);
-      triggerRerender();
     } else {
       setError(errorMessage(res, "Comment Could Not be Posted"));
       setPostCommentStatus("post-failure");
