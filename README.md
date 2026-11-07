@@ -6,6 +6,12 @@ Collaborative task management: projects, members, tasks with priorities and due 
 - **Backend:** Node + Express 4, MongoDB (Mongoose), zod validation, `jose` JWT
 - **Auth:** httpOnly cookie session (`tms_token`), server-side revocation on logout, rate-limited login
 
+## Features
+
+- Projects, members and tasks with priorities and due dates; discussions and file attachments
+- **Kanban board** (To Do / In Progress / In Review / Completed) with drag and drop and a keyboard-friendly status menu
+- **Deadline risk radar**: explainable per-task risk scores. Each flagged task lists the exact reasons (overdue, too little time for the remaining work given how long this project's finished tasks usually take, no recent activity, overloaded assignee), and the board shows risk chips on cards. Logic lives in `backend/utils/risk.js`.
+
 ## Run locally
 
 ```bash

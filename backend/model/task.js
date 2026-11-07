@@ -12,6 +12,8 @@ const taskSchema = new mongoose.Schema(
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     // Existing tasks are "In Progress"/"Completed"; new tasks start in the board's first column.
     taskStatus: { type: String, enum: TASK_STATUSES, default: "To Do" },
+    // Set automatically when a task enters/leaves "Completed"; feeds cycle-time statistics.
+    completedAt: { type: Date },
     // Kept as strings for compatibility with the existing UI date handling.
     dueDate: { type: String },
     assignedOn: { type: String },
@@ -20,5 +22,12 @@ const taskSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+taskSchema.pre("save", function (next) {
+  if (this.isModified("taskStatus")) {
+    this.completedAt = this.taskStatus === "Completed" ? new Date() : undefined;
+  }
+  next();
+});
 
 module.exports = mongoose.model("Task", taskSchema);

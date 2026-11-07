@@ -6,6 +6,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const { notFound, badRequest, conflict, forbidden } = require("../utils/AppError");
 const { PUBLIC_USER_FIELDS, idEq, isManager, isMember, loadProject, requireMember, requireManager } = require("../utils/access");
 const { deleteTasksCascade } = require("../utils/cascade");
+const { assessProject } = require("../utils/risk");
 
 // ----- GET -----
 exports.get_all_projects = asyncHandler(async (req, res) => {
@@ -44,6 +45,13 @@ exports.get_project_overall_performance_by_id = asyncHandler(async (req, res) =>
   ]);
   const overallPerformance = total === 0 ? 0 : Math.round((completed / total) * 100);
   res.status(200).json({ overallPerformance, totalTasks: total, completedTasks: completed });
+});
+
+exports.get_project_risk_by_id = asyncHandler(async (req, res) => {
+  const project = await loadProject(req.params.projectId);
+  requireMember(project, req.user.id);
+  const tasks = await Task.find({ project: project._id }).lean();
+  res.status(200).json(assessProject(tasks));
 });
 
 // ----- POST -----

@@ -10,6 +10,7 @@ router.get("/get-all-projects", c.get_all_projects);
 router.get("/get-project-by-id/:projectId", validate({ params: pid }), c.get_project_by_id);
 router.get("/get-project-members-by-id/:projectId", validate({ params: pid }), c.get_project_members_by_id);
 router.get("/get-all-tasks-by-project-id/:projectId", validate({ params: pid }), c.get_all_tasks_by_project_id);
+router.get("/get-project-risk-by-id/:projectId", validate({ params: pid }), c.get_project_risk_by_id);
 router.get("/get-project-overall-performance-by-id/:projectId", validate({ params: pid }), c.get_project_overall_performance_by_id);
 
 router.post("/add-new-member-by-project-id/:projectId", validate({ params: pid, body: s.memberBody }), c.add_member_to_project_by_id);

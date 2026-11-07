@@ -5,6 +5,7 @@ import { TASK_STATUSES, TaskStatus } from "../Constants";
 import { canMoveTask, groupTasksByStatus, isOverdue, withStatus } from "../helper/board";
 import { changeTaskStatus } from "../services/taskServices";
 import { errorMessage } from "../services/apiClient";
+import RiskChip from "./RiskChip";
 
 const COLUMN_DOT: Record<TaskStatus, string> = {
   "To Do": "bg-inactiveC11",
@@ -21,11 +22,13 @@ const initials = (u?: any) => (u ? `${u.firstName?.[0] || ""}${u.lastName?.[0] |
 interface Props {
   project: any;
   me: any;
+  /** Deadline risk per task id (from the risk radar); optional. */
+  riskByTask?: Record<string, { level: any; reasons: string[] }>;
   /** Called after a move has been saved on the server. */
   onChanged: () => void;
 }
 
-function KanbanBoard({ project, me, onChanged }: Props) {
+function KanbanBoard({ project, me, riskByTask = {}, onChanged }: Props) {
   const [tasks, setTasks] = useState<any[]>(project?.allTasks || []);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overColumn, setOverColumn] = useState<TaskStatus | null>(null);
@@ -157,6 +160,11 @@ function KanbanBoard({ project, me, onChanged }: Props) {
                       >
                         {task.taskTitle}
                       </Link>
+                      {(riskByTask[task._id]?.level === "high" || riskByTask[task._id]?.level === "medium") && (
+                        <div className="mt-1">
+                          <RiskChip level={riskByTask[task._id].level} reasons={riskByTask[task._id].reasons} />
+                        </div>
+                      )}
                       <div className="flex flex-row items-center justify-between gap-2 mt-2">
                         <div className="flex flex-row items-center gap-1 min-w-0">
                           <span

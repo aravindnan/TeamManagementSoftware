@@ -157,6 +157,26 @@ describe("projects & tasks", () => {
     await bystander.a.put(`/change-task-status-by-id/${id}`).send({ newStatus: "Completed" }).expect(403);
   });
 
+  test("risk radar: members only, explains each task, and completedAt tracks completion", async () => {
+    const { m, t, outsider, projectId } = await setup();
+    const overdue = await m.a.post(`/add-new-task-by-project-id/${projectId}`).send({ ...taskBody(t.id), dueDate: "2020-01-01" });
+    await m.a.post(`/add-new-task-by-project-id/${projectId}`).send({ ...taskBody(t.id), taskTitle: "Far away", dueDate: "2099-01-01" });
+    await outsider.a.get(`/get-project-risk-by-id/${projectId}`).expect(403);
+    const res = await t.a.get(`/get-project-risk-by-id/${projectId}`).expect(200);
+    expect(res.body.summary).toMatchObject({ openTasks: 2, high: 1, onTrack: 1 });
+    expect(res.body.tasks[0].taskId).toBe(overdue.body.taskId);
+    expect(res.body.tasks[0].reasons[0]).toMatch(/^Overdue by/);
+
+    const Task = mongoose.model("Task");
+    expect((await Task.findById(overdue.body.taskId)).completedAt).toBeUndefined();
+    await t.a.put(`/change-task-status-by-id/${overdue.body.taskId}`).send({ newStatus: "Completed" }).expect(200);
+    expect((await Task.findById(overdue.body.taskId)).completedAt).toBeInstanceOf(Date);
+    await t.a.put(`/change-task-status-by-id/${overdue.body.taskId}`).send({ newStatus: "In Progress" }).expect(200);
+    expect((await Task.findById(overdue.body.taskId)).completedAt).toBeUndefined();
+    const after = await t.a.get(`/get-project-risk-by-id/${projectId}`).expect(200);
+    expect(after.body.summary.openTasks).toBe(2);
+  });
+
   test("performance endpoint works", async () => {
     const { m, t, projectId } = await setup();
     const c = await m.a.post(`/add-new-task-by-project-id/${projectId}`).send(taskBody(t.id));
