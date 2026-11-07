@@ -80,10 +80,12 @@ describe("auth", () => {
 });
 
 describe("users", () => {
-  test("directory exposes only public fields", async () => {
-    const { a } = await signup(1); await signup(2);
+  test("directory exposes only public fields, and only people you share a project with", async () => {
+    const { a, id } = await signup(1); const two = await signup(2); await signup(3); // user3 is a stranger
+    const projectId = (await a.post(`/create-new-project-for-user-id/${id}`).send({ projectName: "P" })).body.project._id;
+    await a.post(`/add-new-member-by-project-id/${projectId}`).send({ memberId: two.id }).expect(200);
     const res = await a.get("/get-all-users").expect(200);
-    expect(res.body.length).toBe(2);
+    expect(res.body.map((u) => u.username).sort()).toEqual(["user1", "user2"]); // not user3
     for (const u of res.body) {
       expect(u.password).toBeUndefined();
       expect(u.dateOfBirth).toBeUndefined();

@@ -30,6 +30,8 @@ function createApp() {
   // Public: register, login, logout (+ /me which guards itself)
   app.use("/", require("./routes/auth"));
 
+  app.use("/", require("./routes/invitePublic")); // invitation preview works before sign-in
+
   // Everything below requires an authenticated, non-revoked session.
   app.use(requireAuth);
   app.use("/", require("./routes/user"));
@@ -37,6 +39,7 @@ function createApp() {
   app.use("/", require("./routes/task"));
   app.use("/", require("./routes/upload"));
   app.use("/", require("./routes/notification"));
+  app.use("/", require("./routes/workspace"));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

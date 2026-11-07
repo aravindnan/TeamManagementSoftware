@@ -7,6 +7,8 @@ const { notFound, badRequest, conflict, forbidden } = require("../utils/AppError
 const { PUBLIC_USER_FIELDS, idEq, isManager, isMember, loadProject, requireMember, requireManager } = require("../utils/access");
 const { deleteTasksCascade } = require("../utils/cascade");
 const { assessProject } = require("../utils/risk");
+const Workspace = require("../model/workspace");
+const { removeMemberFromProject } = require("../utils/projectMembers");
 const { computeAnalytics } = require("../utils/analytics");
 const Activity = require("../model/activity");
 const Notification = require("../model/notification");
@@ -22,7 +24,8 @@ exports.get_project_by_id = asyncHandler(async (req, res) => {
     .populate("allTasks")
     .populate("projectManager", PUBLIC_USER_FIELDS)
     .populate("projectMembers", PUBLIC_USER_FIELDS)
-    .populate("projectComments");
+    .populate("projectComments")
+    .populate("workspace", "name");
   if (!project) throw notFound("Project not found");
   requireMember(project, req.user.id);
   res.status(200).json(project);
@@ -136,6 +139,10 @@ exports.add_member_to_project_by_id = asyncHandler(async (req, res) => {
   const newMember = await User.findById(memberId).select("firstName lastName").lean();
   if (!newMember) throw notFound("User not found");
   if (isMember(project, memberId)) throw badRequest("User is already a member of the project");
+  // Projects inside a workspace can only include people from that workspace.
+  if (project.workspace && !(await Workspace.exists({ _id: project.workspace, "members.user": memberId }))) {
+    throw badRequest("Add this person to the workspace first (invite them from the Workspaces panel)");
+  }
 
   await Promise.all([
     Project.updateOne({ _id: project._id }, { $addToSet: { projectMembers: memberId } }),
@@ -194,19 +201,9 @@ exports.remove_member_from_project_by_id = asyncHandler(async (req, res) => {
   if (isManager(project, memberId)) throw badRequest("The project manager cannot be removed");
   if (!isMember(project, memberId)) throw badRequest("User is not a member of the project");
 
-  // Hand the leaver's tasks in this project to the manager so nothing is orphaned.
-  const orphaned = await Task.find({ project: project._id, assignedTo: memberId }).select("_id");
-  const orphanIds = orphaned.map((t) => t._id);
-  if (orphanIds.length) {
-    await Task.updateMany({ _id: { $in: orphanIds } }, { assignedTo: project.projectManager });
-    await User.updateOne({ _id: project.projectManager }, { $push: { allTasks: { $each: orphanIds } } });
-  }
-  await Promise.all([
-    Project.updateOne({ _id: project._id }, { $pull: { projectMembers: memberId } }),
-    User.updateOne({ _id: memberId }, { $pull: { involvedProjects: project._id }, $pullAll: { allTasks: orphanIds } }),
-  ]);
+  const reassigned = await removeMemberFromProject(project, memberId);
   await logActivity(req.user.id, project._id, "member.removed", {
-    data: { memberName: fullName(leaver), reassigned: orphanIds.length },
+    data: { memberName: fullName(leaver), reassigned },
     notify: [memberId],
   });
   res.status(200).json({ message: "Member removed from the project successfully", deleteStatus: true });

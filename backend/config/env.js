@@ -32,6 +32,10 @@ module.exports = {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean),
+  // Google sign-in: the OAuth client ID from Google Cloud Console (no secret needed for ID-token verification).
+  googleClientId: process.env.GOOGLE_CLIENT_ID,
+  // Where the web app lives; used to build the invite links people receive.
+  publicClientUrl: (process.env.PUBLIC_CLIENT_URL || (process.env.CLIENT_ORIGINS || "http://localhost:3000").split(",")[0]).trim().replace(/\/$/, ""),
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUDNAME,
     apiKey: process.env.CLOUDINARY_APIKEY,

@@ -33,6 +33,7 @@ const register = z.object({
   role: trimmed(1, 60, "Role"),
   dateOfBirth: trimmed(1, 40, "Date of birth"),
 });
+const google = z.object({ credential: z.string().min(20, "Missing Google credential").max(8192) });
 const login = z.object({
   username: z.string().trim().min(1, "Username is required").max(254),
   password: z.string().min(1, "Password is required").max(128),
@@ -51,6 +52,7 @@ const userSearch = z.object({ q: z.string().trim().max(60).optional() });
 
 // ---- projects
 const createProject = z.object({
+  workspaceId: objectId.optional(),
   projectName: trimmed(1, 100, "Project name"),
   projectDescription: z.string().trim().max(2000).optional().default(""),
 });
@@ -106,6 +108,16 @@ const updateSubtask = z
   .object({ title: trimmed(1, 200, "Sub-task").optional(), done: z.boolean().optional() })
   .refine((o) => Object.keys(o).length > 0, "Nothing to update");
 
+// ---- workspaces
+const workspaceName = z.object({ name: trimmed(2, 60, "Workspace name") });
+const memberRole = z.object({ role: z.enum(["admin", "member"]) });
+const transferOwnership = z.object({ userId: objectId });
+const createInvite = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email address").max(254),
+  role: z.enum(["admin", "member"]).optional().default("member"),
+});
+const acceptInvite = z.object({ token: z.string().min(20).max(200) });
+
 // ---- activity feed
 const activityQuery = z.object({
   before: objectId.optional(),
@@ -127,7 +139,7 @@ const addMedia = z.object({ mediaDataArray: z.array(mediaItem).min(1).max(20) })
 const removeMedia = z.object({ mediaURL: z.string().url().max(2048) });
 
 module.exports = {
-  idParam, register, login, updateProfile, userSearch,
+  idParam, register, login, google, updateProfile, userSearch,
   createProject, editProject, memberBody, addTask,
-  editTask, changeStatus, comment, addMedia, removeMedia, activityQuery, notificationQuery, patchTask, addSubtask, updateSubtask,
+  editTask, changeStatus, comment, addMedia, removeMedia, activityQuery, notificationQuery, patchTask, addSubtask, updateSubtask, workspaceName, memberRole, transferOwnership, createInvite, acceptInvite,
 };

@@ -7,6 +7,7 @@ const { PUBLIC_USER_FIELDS } = require("../utils/access");
 const { deleteTasksCascade } = require("../utils/cascade");
 const { logActivity } = require("../utils/activity");
 const Notification = require("../model/notification");
+const Workspace = require("../model/workspace");
 
 const getFullProfile = (userId) =>
   User.findById(userId).populate("myProjects").populate("involvedProjects").populate("allTasks");
@@ -25,6 +26,16 @@ exports.get_all_users = asyncHandler(async (req, res) => {
     const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     filter.$or = [{ firstName: rx }, { lastName: rx }, { username: rx }, { email: rx }];
   }
+  // Only people you actually share a workspace or a project with: this is not a directory of every account.
+  const [workspaces, projects] = await Promise.all([
+    Workspace.find({ "members.user": req.user.id }).select("members.user").lean(),
+    Project.find({ projectMembers: req.user.id }).select("projectMembers").lean(),
+  ]);
+  const visible = new Set();
+  workspaces.forEach((w) => w.members.forEach((m) => visible.add(String(m.user))));
+  projects.forEach((p) => p.projectMembers.forEach((id) => visible.add(String(id))));
+  filter._id = { $in: [...visible] };
+
   const users = await User.find(filter).select(PUBLIC_USER_FIELDS).sort({ firstName: 1 }).limit(200);
   res.status(200).json(users);
 });
@@ -59,8 +70,12 @@ exports.get_all_tasks_by_user_id = asyncHandler(async (req, res) => {
 
 exports.create_new_project_for_user_id = asyncHandler(async (req, res) => {
   requireSelf(req);
-  const { projectName, projectDescription } = req.body;
+  const { projectName, projectDescription, workspaceId } = req.body;
+  if (workspaceId && !(await Workspace.exists({ _id: workspaceId, "members.user": req.user.id }))) {
+    throw forbidden("You are not a member of that workspace");
+  }
   const project = await Project.create({
+    workspace: workspaceId,
     projectName,
     projectDescription,
     projectManager: req.user.id,
@@ -86,6 +101,10 @@ exports.update_user_profile_by_user_id = asyncHandler(async (req, res) => {
 
 exports.delete_user_by_user_id = asyncHandler(async (req, res) => {
   requireSelf(req);
+  if (await Workspace.exists({ owner: req.user.id })) {
+    throw conflict("Transfer ownership of your workspaces or delete them before deleting your account");
+  }
+  await Workspace.updateMany({ "members.user": req.user.id }, { $pull: { members: { user: req.user.id } } });
   if (await Project.exists({ projectManager: req.user.id })) {
     throw conflict("Delete or hand over the projects you manage before deleting your account");
   }

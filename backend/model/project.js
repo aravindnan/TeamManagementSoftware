@@ -5,6 +5,8 @@ const projectSchema = new mongoose.Schema(
   {
     projectName: { type: String, required: true, trim: true },
     projectDescription: { type: String, default: "" },
+    // Optional: projects created before workspaces existed have none.
+    workspace: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", index: true },
     projectManager: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     projectMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     allTasks: [{ type: mongoose.Schema.Types.ObjectId, ref: "Task" }],
