@@ -27,7 +27,7 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       # The tests run against an in-memory MongoDB; cache the downloaded binary between runs.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.cache/mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('backend/package-lock.json') }}
