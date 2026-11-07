@@ -1,6 +1,5 @@
-import { CloseRounded, Logout, MenuRounded } from '@mui/icons-material'
-import { Menu } from '@mui/material'
-import React, { useState } from 'react'
+import { Logout } from '@mui/icons-material'
+import React, {} from 'react'
 import { useSelector } from 'react-redux';
 import Logo from '../common/Logo';
 import { Link } from 'react-router-dom';

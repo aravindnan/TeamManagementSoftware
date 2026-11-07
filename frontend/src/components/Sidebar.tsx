@@ -1,11 +1,10 @@
-import { AccountCircle, Logout } from '@mui/icons-material'
+import { Logout } from '@mui/icons-material'
 import { Tooltip } from '@mui/material'
 import React from 'react'
 import Logo from '../common/Logo'
 import { Link } from 'react-router-dom'
 import { colors } from '../Constants'
 import { useSelector } from 'react-redux'
-import { getRandomColor } from '../helper/helper'
 
 function Sidebar(props:any) {
     const{setUserProfileModal,setLogoutModal,activePage}=props

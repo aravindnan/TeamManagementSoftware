@@ -1,11 +1,11 @@
 import { Comment, Edit } from '@mui/icons-material'
-import { error } from 'console'
 import moment from 'moment'
 import React, { useEffect, useRef, useState } from 'react'
 import { colors } from '../Constants'
 import ErrorBox from '../common/ErrorBox'
 import NoDataMessage from '../common/NoDataMessage'
 import { addCommentToProjectById } from '../services/projectServices'
+import { errorMessage } from '../services/apiClient'
 
 function ProjectPageDiscussion(props:any) {
    
@@ -26,12 +26,7 @@ function ProjectPageDiscussion(props:any) {
       }, [error]);
 
 
-    const emptyState = {
-        senderName: `${myProfiledata?.firstName} ${myProfiledata?.lastName}`,
-        messageContent: "",
-        senderId: myProfiledata?._id,
-        timeStamp: moment.utc().toISOString(),
-      };
+    const emptyState = { messageContent: "" };
     
       const [projectCommentFormData, setProjectCommentFormData] = useState(emptyState);
     
@@ -51,29 +46,16 @@ function ProjectPageDiscussion(props:any) {
       };
     
       const handleSubmit = async () => {
+        if (!validateBeforeSubmit()) return;
         setPostCommentStatus("post-loading");
-        if (validateBeforeSubmit()) {
-          console.log("Perform Comment Posting logic");
-          await addCommentToProjectById(activeProject?._id, projectCommentFormData)
-            .then((res: any) => {
-              console.log("(INREACT) ADD COMMENT RESULT :", res);
-              if (res.addStatus) {
-                setPostCommentStatus("not-posted");
-                triggerRerender();
-              } else {
-                console.log("(INREACT)ADD COMMENT ERROR", res);
-                setError("Comment Could Not be Posted");
-                setProjectCommentFormData(emptyState);
-                setPostCommentStatus("post-failure")
-              }
-            })
-            .catch((err: any) => {
-              console.log("(INREACT) in catch ADD COMMENT ERROR", err);
-            });
-    
+        const res: any = await addCommentToProjectById(activeProject?._id, projectCommentFormData);
+        if (res?.addStatus) {
+          setPostCommentStatus("not-posted");
           setProjectCommentFormData(emptyState);
+          triggerRerender();
         } else {
-          console.error("Validation failed. Display error message.");
+          setError(errorMessage(res, "Comment Could Not be Posted"));
+          setPostCommentStatus("post-failure");
         }
       };
     
@@ -97,7 +79,7 @@ function ProjectPageDiscussion(props:any) {
 
       <div className="flex flex-col gap-3 my-1 bg-gray-50 min-h-[200px] items-center md:min-h-[300px] overflow-y-auto p-2 max-h-[300px]" ref={commentsContainerRef}>
         {activeProject?.projectComments.map((node: any) => (
-          <>
+          <React.Fragment key={node._id}>
             {node?.senderId === myProfiledata?._id ? (
               <div className="flex flex-col group text-[12px] max-w-full break-words hover:bg-C44 cursor-pointer transition-all p-2 w-full border-r-4 hover:border-C11 ">
                 <div
@@ -137,7 +119,7 @@ function ProjectPageDiscussion(props:any) {
                 </div>
               </div>
             )}
-          </>
+          </React.Fragment>
         ))}
 
         {activeProject?.projectComments.length === 0 && (
@@ -161,9 +143,7 @@ function ProjectPageDiscussion(props:any) {
         id="messageContent"
         value={projectCommentFormData.messageContent}
         onChange={handleInputChange}
-      >
-        projectCommentFormData.messageContent
-      </textarea>
+      />
       <div className="flex justify-end py-2">
         <button
           disabled={postCommentStatus === "post-loading"?true:false}

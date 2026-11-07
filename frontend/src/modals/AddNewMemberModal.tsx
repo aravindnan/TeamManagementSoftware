@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { projectMembers } from "../data/data";
-import { Add, Close } from "@mui/icons-material";
+import { Close } from "@mui/icons-material";
 import ErrorBox from "../common/ErrorBox";
 import { getAllUsers } from "../services/userServices";
 import APIResponseStatus from "../common/APIResponseStatus";
 import { addMemberToProject } from "../services/projectServices";
 import { useSelector } from "react-redux";
-import { resolve } from "path/posix";
 
 function AddNewMemberModal(props: any) {
   const { setAddMemberModal ,triggerRerender,activeProject} = props;
@@ -38,7 +36,6 @@ function AddNewMemberModal(props: any) {
   const getUsers =async()=>{
      await getAllUsers().then((res:any)=>{
         const tempARRAY= res.filter((user:any)=>(user._id!==myProfiledata?._id))
-        console.log(" PPL IN MODAL ",tempARRAY);
         if(tempARRAY.length>0){
           setLoading(false)
         }
@@ -74,10 +71,8 @@ function AddNewMemberModal(props: any) {
   const handleSubmit = async() => {
     // Add your validation logic here
     if (validateBeforeSubmit()) {
-      console.log("GOIN TO ADD MEMBER", addMemberFormData.memberId);
       setAddNewMemberStatus("add-loading")
       await addMemberToProject(activeProject?._id,addMemberFormData).then((res:any)=>{
-        console.log("(INREACT) ADDMEMBER PROJECT BY ID RESULT",res.data)
         const tempOBJ = res.data
         triggerRerender()
         setAddMemberFormData(emptyState)
@@ -90,7 +85,6 @@ function AddNewMemberModal(props: any) {
       // setAddNewTaskFormData(emptyState);
     } else {
       // Display error message
-      console.error("Validation failed. Display error message.");
     }
   };
 

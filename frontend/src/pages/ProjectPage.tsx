@@ -7,8 +7,6 @@ import AddNewTaskModal from "../modals/AddNewTaskModal";
 import ViewAllTaskModal from "../modals/ViewAllTaskModal";
 import Sidebar from "../components/Sidebar";
 import UserProfileModal from "../modals/UserProfileModal";
-import OverallPerformaceModal from "../modals/OverallPerformaceModal";
-import { performanceData } from "../data/data";
 import RemoveMemberConfirmationModal from "../modals/RemoveMemberConfirmationModal";
 import ViewMemberModal from "../modals/ViewMemberModal";
 import EditProjectInfoModal from "../modals/EditProjectInfoModal";
@@ -16,19 +14,14 @@ import AddNewMemberModal from "../modals/AddNewMemberModal";
 import DeleteProjectConfirmationModal from "../modals/DeleteProjectConfirmationModal";
 import ProjectPageAddMediaModal from "../modals/ProjectPageAddMediaModal";
 import ViewMediaModal from "../modals/ViewMediaModal";
-import { addCommentToProjectById, getProjectById } from "../services/projectServices";
-import * as projectActions from "../redux/actions/projectActions"
+import { getProjectById } from "../services/projectServices";
 import { useDispatch, useSelector } from "react-redux";
-import { getUserDetailsFromToken } from "../services/authServices";
-import { getUserById } from "../services/userServices";
+import { getMe } from "../services/authServices";
 import * as authActions from "../redux/actions/authActions"
 import { useNavigate } from "react-router";
 import TopBar from "../components/TopBar";
-import ErrorBox from "../common/ErrorBox";
-import { Comment, Edit } from "@mui/icons-material";
-import { colors } from "../Constants";
-import NoDataMessage from "../common/NoDataMessage";
-import moment from "moment";
+
+
 import ProjectPageDiscussion from "../components/ProjectPageDiscussion";
 import APIResponseStatus from "../common/APIResponseStatus";
 
@@ -74,15 +67,13 @@ function ProjectPage() {
 
   useEffect(() => {
     const queryString = window.location.search;
-    console.log(queryString);
     let urlParams = new URLSearchParams(queryString);
     const projectId = urlParams.get("id");
-    console.log("projectID in projectProject : ", projectId);
     if (projectId) {
       getProjectData(projectId)
     }
     else{
-      navigate("*") 
+      navigate("/not-found", { replace: true })
     }
   }, [rerender]);
 
@@ -93,21 +84,15 @@ function ProjectPage() {
     setRerender((prev) => !prev);
   };
 
-  const getProjectData=async(projectId:any)=>{
-    await getProjectById(projectId).then((res:any)=>{
-      console.log("in TASKPAGE RETURNED TASK ",res.code);
-      if(res.code==="ERR_NETWORK"){
-        setNetworkError(true)
-        console.log("NETWORK ERROR ")
-        setPageLoading("error")
-      }
-      else{
-        setPageLoading("loaded")
-        setActiveProject(res)
-      }
-    }).catch((err:any)=>{
-      console.log(err)
-    })
+  const getProjectData = async (projectId: string) => {
+    const res: any = await getProjectById(projectId)
+    if (res?._id) {
+      setPageLoading("loaded")
+      setActiveProject(res)
+    } else {
+      setNetworkError(res?.code === "ERR_NETWORK")
+      setPageLoading("error")
+    }
   }
 
   useEffect(()=>{
@@ -131,31 +116,18 @@ function ProjectPage() {
   // );
 const dispatch = useDispatch()
 useEffect(() => {
-  const existingUser:any = getUserDetailsFromToken()
-  console.log("EXISITING USER ID : ",existingUser)
-
-  if (existingUser?._id) {
-     getMyProfileData(existingUser._id)
-  }
-  else{
-    navigate("*") 
-  }
+  getMyProfileData()
 }, []);
 
-const getMyProfileData =async(myUserId:any)=>{
-  await getUserById(myUserId).then((res:any)=>{
-    console.log("in DAHBOARD FUNCTION: ",res);
-    if(res.code==="ERR_NETWORK"){
-      setNetworkError(true)
-      console.log("NETWORK ERROR ") 
-    }else{
-
-      dispatch(authActions.loginAction(res))
-    }
-  }).catch((err:any)=>{
-    setNetworkError(true)
-    console.log("NETWORK ERROR ",err) 
-  })
+const getMyProfileData = async () => {
+  const res: any = await getMe()
+  if (res === null) {
+    navigate("/login")
+  } else if (res?._id) {
+    dispatch(authActions.loginAction(res))
+  } else {
+    setNetworkError(res?.code === "ERR_NETWORK")
+  }
 }
 
   return (
@@ -252,14 +224,6 @@ const getMyProfileData =async(myUserId:any)=>{
       setUserProfileModal={setUserProfileModal}
       />:null
      }
-      {/* {
-          // Overall Performance project modal
-          overallPerformaceModal?
-          <OverallPerformaceModal
-          data = {performanceData[1]}
-          setOverallPerformanceModal={setOverallPerformanceModal}
-          />:null
-        } */}
       {
         // Remove Memeber Confirmation Modal
         removeMemberModal.isOpen?

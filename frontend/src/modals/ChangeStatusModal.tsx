@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import APIResponseStatus from '../common/APIResponseStatus'
 import { Close } from '@mui/icons-material'
-import { Link } from 'react-router-dom'
 import { changeTaskStatus } from '../services/taskServices'
 
 function ChangeStatusModal(props:any) {
@@ -21,16 +20,13 @@ function ChangeStatusModal(props:any) {
 
 
     const handleUpdate =async()=>{
-      // console.log("Perform registration logic");
       setUpdateTaskStatus("update-loading")
       await changeTaskStatus(activeTask?._id,currentStatus).then((res:any)=>{
-        console.log("(inreact)CHANGE TASK STATUS BY ID RESULT : ",res)
         if(res?.updateStatus){
           setUpdateTaskStatus("update-success")
           triggerRerender()
         }
       }).catch((err:any)=>{
-        console.log("(inreact)CHANGE TASK STATUS BY ID ERROR :",err)
         setUpdateTaskStatus("update-failure")
       })
       

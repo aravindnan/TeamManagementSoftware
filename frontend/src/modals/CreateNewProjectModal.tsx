@@ -1,11 +1,8 @@
-import { Add } from "@mui/icons-material";
 import React, { useEffect, useState } from "react";
-import { projectMembers } from "../data/data";
 import ErrorBox from "../common/ErrorBox";
 import { createNewProject } from "../services/projectServices";
 import { useSelector } from "react-redux";
 import APIResponseStatus from "../common/APIResponseStatus";
-import { useNavigate } from "react-router";
 import { Link } from "react-router-dom";
 
 function CreateNewProjectModal(props: any) {
@@ -66,22 +63,18 @@ function CreateNewProjectModal(props: any) {
     if (validateBeforeSubmit()) {
       setCreateProjectStatus("create-loading")
       // Perform registration logic here call API
-      console.log("Perform registration logic");
       await createNewProject(createProjectFormData,myProfiledata._id).then((res:any)=>{
-        console.log("INSIDE CREATE PROJECT :",res)
         setCreateProjectFormData(emptyState)
         setCreateProjectStatus("create-success")
         setCreatedProjectId(res?.project?._id);
         triggerRerender()
 
       }).catch((err:any)=>{
-        console.log("INSIDE CREATE PROJECT :",err)
         setCreateProjectStatus("create-failure")
         setApiResponseMessage(err.response.data.error)
       })
     } else {
       // Display error message
-      console.error("Validation failed. Display error message.");
     }
   };
 

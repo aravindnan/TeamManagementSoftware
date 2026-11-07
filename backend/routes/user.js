@@ -1,21 +1,19 @@
 const express = require("express");
-const userRouter = express.Router();
-const userController = require("../controller/userController");
+const c = require("../controller/userController");
+const validate = require("../middleware/validate");
+const s = require("../schemas");
 
-// Register a new user
-userRouter.get("/get-all-users", userController.get_all_users);//
-userRouter.get("/get-user-by-id/:userId", userController.get_user_by_id);//
-userRouter.get("/get-all-my-projects-by-user-id/:userId",userController.get_all_my_projects_by_user_id)//
-userRouter.get("/get-all-involved-projects-by-user-id/:userId",userController.get_all_involved_projects_by_user_id)//
-userRouter.get("/get-all-tasks-by-user-id/:userId",userController.get_all_tasks_by_user_id)//
-userRouter.get("/get-all-completed-tasks-by-user-id/:userId",userController.get_all_completed_tasks_by_user_id)//
-userRouter.get("/get-all-pending-tasks-by-user-id/:userId",userController.get_all_pending_tasks_by_user_id)//
-userRouter.post("/create-new-project-for-user-id/:userId",userController.create_new_project_for_user_id)//
+const router = express.Router();
+const userId = validate({ params: s.idParam("userId") });
 
-userRouter.put("/update-user-profile/:userId",userController.update_user_profile_by_user_id)//
-userRouter.delete("/delete-user/:userId",userController.delete_user_by_user_id)//
+router.get("/get-all-users", validate({ query: s.userSearch }), c.get_all_users);
+router.get("/get-user-by-id/:userId", userId, c.get_user_by_id);
+router.get("/get-all-my-projects-by-user-id/:userId", userId, c.get_all_my_projects_by_user_id);
+router.get("/get-all-involved-projects-by-user-id/:userId", userId, c.get_all_involved_projects_by_user_id);
+router.get("/get-all-tasks-by-user-id/:userId", userId, c.get_all_tasks_by_user_id);
 
-userRouter.delete("/delete-all-users",userController.delete_all_users)
+router.post("/create-new-project-for-user-id/:userId", validate({ params: s.idParam("userId"), body: s.createProject }), c.create_new_project_for_user_id);
+router.put("/update-user-profile/:userId", validate({ params: s.idParam("userId"), body: s.updateProfile }), c.update_user_profile_by_user_id);
+router.delete("/delete-user/:userId", userId, c.delete_user_by_user_id);
 
-
-module.exports = userRouter;
+module.exports = router;

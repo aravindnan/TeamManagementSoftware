@@ -1,17 +1,26 @@
 const express = require("express");
-const authRouter = express.Router();
-const authController = require("../controller/authController");
+const rateLimit = require("express-rate-limit");
+const c = require("../controller/authController");
+const validate = require("../middleware/validate");
+const requireAuth = require("../middleware/auth");
+const s = require("../schemas");
+const { isTest } = require("../config/env");
 
-// Register a new user
-authRouter.post("/register", authController.register);
+const router = express.Router();
 
-// Login
-authRouter.post("/login", authController.login);
+// Brute-force protection on credential endpoints.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  skip: () => isTest,
+  message: { error: "Too many attempts, please try again later" },
+});
 
-// Logout
-authRouter.post("/logout",authController.logout)
+router.post("/register", authLimiter, validate({ body: s.register }), c.register);
+router.post("/login", authLimiter, validate({ body: s.login }), c.login);
+router.post("/logout", c.logout);
+router.get("/me", requireAuth, c.me);
 
-// Delete ALL Data
-authRouter.delete("/delete-all-data",authController.delete_all_data)
-
-module.exports = authRouter;
+module.exports = router;

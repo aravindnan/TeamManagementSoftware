@@ -6,7 +6,6 @@ import { Link } from 'react-router-dom'
 
 function DashboardMyProjects(props:any) {
   const{setCreateNewProjectModal,myProjects}=props
-  console.log("MyPrjects : ",myProjects)
   return (
     <>
      <div className="flex flex-col mt-5 lg:mt-20">

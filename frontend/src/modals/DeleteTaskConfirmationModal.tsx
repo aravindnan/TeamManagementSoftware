@@ -11,16 +11,13 @@ function DeleteTaskConfirmationModal(props:any) {
 
 
     const handleDelete =async()=>{
-      // console.log("Perform registration logic");
       setDeleteTaskStatus("delete-loading")
 
       await deleteTaskById(activeTask?._id).then((res:any)=>{
-        console.log("(inreact)DELETE TASK BY ID RESULT : ",res)
         if(res?.deleteStatus){
           setDeleteTaskStatus("delete-success")
         }
       }).catch((err:any)=>{
-        console.log("(inreact)DELETE TASK BY ID ERROR :",err)
         setDeleteTaskStatus("delete-failure")
       })
       

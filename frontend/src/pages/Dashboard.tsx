@@ -1,6 +1,5 @@
   import React, { useEffect, useState } from "react";
-  import Logo from "../common/Logo";
-  import { colors } from "../Constants";
+    import { colors } from "../Constants";
   // import { AccountCircle, Logout } from "@mui/icons-material";
   // import { Tooltip } from "@mui/material";
   import DashboardGreeting from "../components/DashboardGreeting";
@@ -11,18 +10,14 @@
   // import { Link } from "react-router-dom";
   import CircularGraph from "../common/CircularGraph";
   import CreateNewProjectModal from "../modals/CreateNewProjectModal";
-  import OverallPerformaceModal from "../modals/OverallPerformaceModal";
-  import { performanceData } from "../data/data";
   import Sidebar from "../components/Sidebar";
   import UserProfileModal from "../modals/UserProfileModal";
   // import Loader from "../common/Loader";
   import LogoutModal from "../modals/LogoutModal";
   // import { url } from "inspector";
-  import { getUserById } from "../services/userServices";
-  import { useDispatch, useSelector } from "react-redux";
+    import { useDispatch, useSelector } from "react-redux";
   import * as authActions from "../redux/actions/authActions"
-  import MagicLoader from "../common/MagicLoader";
-  import { getUserDetailsFromToken } from "../services/authServices";
+    import { getMe } from "../services/authServices";
   import { useNavigate } from "react-router";
 import TopBar from "../components/TopBar";
 import APIResponseStatus from "../common/APIResponseStatus";
@@ -46,34 +41,21 @@ import APIResponseStatus from "../common/APIResponseStatus";
     const dispatch = useDispatch()
     const navigate = useNavigate()
     useEffect(() => {
-      const existingUser:any = getUserDetailsFromToken()
-      console.log("EXISITING USER ID : ",existingUser)
-
-      if (existingUser?._id) {
-        getMyProfileData(existingUser._id)
-      }
-      else{
-        navigate("/") 
-      }
-
+      getMyProfileData()
     }, [rerender]);
     
-    const getMyProfileData =async(myUserId:any)=>{
-      await getUserById(myUserId).then((res:any)=>{
-        console.log("in TASKPAGE RETURNED TASK ",res.code);
-        if(res.code==="ERR_NETWORK"){
-          setNetworkError(true)
-          console.log("NETWORK ERROR ")
-          setPageLoading("error")
-        }
-        else{
-          setPageLoading("loaded")
-          dispatch(authActions.loginAction(res))
-        }
-      }).catch((err:any)=>{
-        console.log(err)
-      })
-  }
+    const getMyProfileData = async () => {
+      const res: any = await getMe()
+      if (res === null) {
+        navigate("/login")
+      } else if (res?._id) {
+        setPageLoading("loaded")
+        dispatch(authActions.loginAction(res))
+      } else {
+        setNetworkError(res?.code === "ERR_NETWORK")
+        setPageLoading("error")
+      }
+    }
 
   useEffect(()=>{
     if (myProfiledata?.allTasks) {
@@ -94,8 +76,6 @@ import APIResponseStatus from "../common/APIResponseStatus";
       
 
 
-    console.log("MYPROFILE : ",myProfiledata);
-    
 
     return (
       <>
@@ -168,15 +148,6 @@ import APIResponseStatus from "../common/APIResponseStatus";
                 ) : null
               }
 
-              {/* {
-                // Overall Performance project modal
-                overallPerformaceModal ? (
-                  <OverallPerformaceModal
-                    data={performanceData[1]}
-                    setOverallPerformanceModal={setOverallPerformanceModal}
-                  />
-                ) : null
-              } */}
 
               {
                 // User Profile Modal

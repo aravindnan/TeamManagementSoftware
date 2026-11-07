@@ -1,17 +1,11 @@
 import {
-  Add,
-  CheckCircle,
   Close,
-  Done,
-  Pending,
-  Rule,
-} from "@mui/icons-material";
+  } from "@mui/icons-material";
 import React, { useState } from "react";
 import { Tooltip } from "@mui/material";
 import { Link } from "react-router-dom";
 import NoDataMessage from "../common/NoDataMessage";
 import moment from "moment";
-import { colors } from "../Constants";
 
 function ViewAllTaskModal(props: any) {
   const { setViewAllTaskModal, activeProject } = props;

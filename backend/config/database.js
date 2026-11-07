@@ -1,17 +1,9 @@
-// define the database connections
-const mongoose = require("mongoose")
-const {DB_NAME ,DB_PASSWORD ,DB_USERNAME} = require("../env/dotenv")
+const mongoose = require("mongoose");
+const { mongoUri } = require("./env");
 
-// Load environment variables from .env file
-const  connectToDatabase = async () => {
-const dbName = DB_NAME
-const dbUsername = DB_USERNAME
-const dbPassword = DB_PASSWORD
+mongoose.set("strictQuery", true);
 
-mongoose.connect(`mongodb+srv://${dbUsername}:${dbPassword}@cluster0.myusfay.mongodb.net/${dbName}?retryWrites=true&w=majority`,
-{
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}
-)}
-module.exports = { connectToDatabase };
+const connectToDatabase = (uri = mongoUri) => mongoose.connect(uri);
+const disconnectFromDatabase = () => mongoose.disconnect();
+
+module.exports = { connectToDatabase, disconnectFromDatabase };

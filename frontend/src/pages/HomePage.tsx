@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Logo from '../common/Logo'
 import { colors } from '../Constants'
-import Loader from '../common/Loader'
-import { getUserDetailsFromToken } from '../services/authServices'
+import { getMe } from '../services/authServices'
 import { useSelector } from 'react-redux'
 
 function HomePage() {
@@ -11,12 +10,9 @@ function HomePage() {
     const [userData, setUserData]= useState<any>()
 
     useEffect(()=>{
-        const existingUser = getUserDetailsFromToken()
-        console.log("Existing User",existingUser)
-        setUserData(existingUser)
-        if(myProfiledata?._id){
-            navigate("/dashboard")
-          }
+        getMe().then((me:any)=>{
+            if (me?._id) setUserData(me)
+        })
     },[])
 
     const navigate = useNavigate()

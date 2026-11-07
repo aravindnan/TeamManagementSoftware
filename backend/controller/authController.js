@@ -1,152 +1,51 @@
-const jwt = require("jsonwebtoken");
-const uuid = require("uuid")
 const bcrypt = require("bcryptjs");
-const User = require("../model/user"); // Assuming you have a User model
+const User = require("../model/user");
+const config = require("../config/env");
+const asyncHandler = require("../utils/asyncHandler");
+const { AppError } = require("../utils/AppError");
+const { setAuthCookie, clearAuthCookie, verifyToken } = require("../middleware/auth");
+const { getFullProfile } = require("./userController");
 
-exports.register = async (req, res) => {
-  console.log("Registering new user...")
-  try {
-    // Extract data from request body
-    const { username, email, password, firstName, lastName, role, dateOfBirth } = req.body;
+// Used to keep login timing similar whether or not the username exists.
+const DUMMY_HASH = bcrypt.hashSync("not-a-real-password", 10);
 
-    // Check if the user already exists by username or email
-    const existingUserByUsername = await User.findOne({ username });
-    const existingUserByEmail = await User.findOne({ email });
+exports.register = asyncHandler(async (req, res) => {
+  const { username, email, password, firstName, lastName, role, dateOfBirth } = req.body;
+  const hashed = await bcrypt.hash(password, 10);
+  await User.create({ username, email, password: hashed, firstName, lastName, role, dateOfBirth });
+  res.status(201).json({ message: "User registered successfully", registerSuccess: true });
+});
 
-    if (existingUserByUsername) {
-      return res.status(400).json({ error: "Username already exists", registerSuccess: false });
+exports.login = asyncHandler(async (req, res) => {
+  const { username, password } = req.body;
+  const user = await User.findOne({ $or: [{ username }, { email: username.toLowerCase() }] }).select("+password +tokenVersion");
+  const ok = await bcrypt.compare(password, user ? user.password : DUMMY_HASH);
+  if (!user || !ok) throw new AppError(401, "Invalid credentials", { success: false });
+
+  user.lastLoginDate = new Date();
+  await user.save();
+  await setAuthCookie(res, user);
+  res.status(200).json({ success: true, loginStatus: true, message: "Login Successful", userId: user._id });
+});
+
+// Public on purpose: a logged-out client can always clear its cookie. Revokes all tokens if one was valid.
+exports.logout = asyncHandler(async (req, res) => {
+  const token = req.cookies?.[config.cookieName] || (req.headers.authorization || "").replace(/^Bearer /, "");
+  if (token) {
+    try {
+      const { sub } = await verifyToken(token);
+      await User.updateOne({ _id: sub }, { $inc: { tokenVersion: 1 } });
+    } catch {
+      /* expired/invalid token: nothing to revoke */
     }
-
-    if (existingUserByEmail) {
-      return res.status(400).json({ error: "Email already exists", registerSuccess: false });
-    }
-
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create a new user
-    const newUser = new User({ // Set userId using uuid4
-      username:username,//
-      email:email,//
-      password: hashedPassword,
-      firstName:firstName,//
-      lastName:lastName,//
-      role:role,//
-      dateOfBirth:dateOfBirth,//
-      loginStatus: false, // Assuming the user is not logged in initially
-      allTasks: [],
-      completedTasks: [],
-      pendingTasks: [],
-      myProjects: [],
-      involvedProjects: [],
-      profilePictureURL:"",
-      bio:"",
-    });
-    await newUser.save();
-
-    // Respond with success
-    res.status(201).json({ message: "User registered successfully" ,registerSuccess: true});
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Internal Server Error" ,registerSuccess: false});
   }
-};
+  clearAuthCookie(res);
+  res.status(200).json({ message: "Logout successful", logoutStatus: true });
+});
 
-exports.login = async (req, res) => {
-  try {
-    // Extract data from request body
-    console.log(" Inside Backend Login \n Login Request Body : ",req.body);
-    const {username, password } = req.body;
-    if (!(username && password)) {
-      res.status(400).send("All input is required");
-    }
-
-    // Check if the user exists
-    const userLog = await User.findOne({username});
-
-    if (!userLog) {
-      return res.status(401).json({ error: "User Does Not Exist" ,success:false });
-    }
-
-    // Check if the password is correct
-    const passwordMatch = await bcrypt.compare(password, userLog.password);
-
-    if (!passwordMatch) {
-      return res.status(401).json({ error: "Invalid credentials" ,success:false });
-    }
-
-    if((userLog&&passwordMatch)){
-      // Generate a JWT token
-      const token = jwt.sign({ _id: userLog._id },
-        "sdfghjklkjhgfdsdfghjklkjgfrtyuiolnbfr567ujbvcder6yujbvcdertyuikjnbvxdfgh", 
-        { expiresIn: "2h" });
-
-      userLog.token = token;
-      userLog.loginStatus = true
-        res.status(200).json({
-            success:true,
-            loginStatus:true,
-            token: token,
-            message:"Login Successful",
-            userId:userLog._id
-
-        });
-
-    }
-    // Respond with the token
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-};
-
-exports.logout = async(req,res)=>{
-  try {
-    // Extract user ID from the token
-    const{ userId }= req.body;
-
-    // Find the user in the database
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Invalidate the user's token (optional, depending on your authentication mechanism)
-    // You might have a blacklist of tokens or a mechanism to handle token invalidation
-
-    // For example, you can set the user's login status to false and clear the token
-    user.loginStatus = false;
-    user.token = null;
-
-    // Save the changes to the user document
-    await user.save();
-
-    // Respond with success message
-    return res.status(200).json({ message: 'Logout successful',logoutStatus:true });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Internal Server Error',logoutStatus:false });
-  }
-}
-
-
-exports.delete_all_data = async (req, res) => {
-  try {
-    // Delete all tasks
-    await Task.deleteMany();
-
-    // Delete all projects
-    await Project.deleteMany();
-
-    // Delete all users
-    await User.deleteMany();
-
-    res.status(200).json({ message: 'All tasks, projects, and users deleted successfully' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-};
-
-
+// Source of truth for "who am I" (the token itself is httpOnly and unreadable by JS).
+exports.me = asyncHandler(async (req, res) => {
+  const profile = await getFullProfile(req.user.id);
+  if (!profile) throw new AppError(404, "User not found");
+  res.status(200).json(profile);
+});

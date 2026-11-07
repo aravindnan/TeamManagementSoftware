@@ -1,11 +1,8 @@
-import { Add, Camera, CameraAlt, Close, Edit } from '@mui/icons-material'
+import { Close, Edit } from '@mui/icons-material'
 import React, { useState } from 'react'
-import { projectMembers } from '../data/data'
 import { Tooltip } from '@mui/material'
-import Loader from '../common/Loader'
 import { useSelector } from 'react-redux'
 import moment from 'moment'
-import { getRandomColor } from '../helper/helper'
 import ErrorBox from '../common/ErrorBox'
 import { editUserById } from '../services/userServices'
 import APIResponseStatus from '../common/APIResponseStatus'
@@ -36,7 +33,6 @@ function UserProfileModal(props:any) {
     }
 
     const validateBeforeSubmit = () => {
-      console.log(userProfileFormData);
   
       if (
         !userProfileFormData.firstName ||
@@ -77,10 +73,8 @@ function UserProfileModal(props:any) {
       
         setEditProfileStatus("edit-loading");
         // Perform registration logic here call API
-        console.log("Perform registration logic");
         await editUserById(myProfiledata?._id,userProfileFormData)
           .then((res: any) => {
-            console.log("(inreact)EDIT PROFILE RESULT : ", res);
             if(res.updateStatus){
               setEditProfileStatus("edit-success");
               triggerRerender()
@@ -91,13 +85,11 @@ function UserProfileModal(props:any) {
             
           })
           .catch((err: any) => {
-            console.log("(inreact)EDIT PROFILE ERROR : ", err);
             setEditProfileStatus("edit-failure");
           });
           setUserProfileFormData(emptyState);
       } else {
         // Display error message
-        console.error("Validation failed. Display error message.");
       }
 
     }

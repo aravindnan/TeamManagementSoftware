@@ -67,7 +67,6 @@ function EditTaskModal(props: any) {
       setEditTaskStatus("edit-loading")
       // Perform registration logic here call API
       await editTaskById(activeTask?._id,editTaskFormData).then((res:any)=>{
-        console.log("(inreact)EDIT TASK BY ID RESULT : ",res)
         if(res.editStatus){
           setEditTaskStatus("edit-success")
           setEditTaskFormData(emptyState)
@@ -80,7 +79,6 @@ function EditTaskModal(props: any) {
       // setAddNewTaskFormData(emptyState);
     } else {
       // Display error message
-      console.error("Validation failed. Display error message.");
     }
   };
 

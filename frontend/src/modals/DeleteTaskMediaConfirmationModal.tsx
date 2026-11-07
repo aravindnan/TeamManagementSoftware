@@ -9,10 +9,8 @@ function DeleteTaskMediaConfirmationModal(props:any) {
 
 
     const handleDelete =async()=>{
-      // console.log("Perform registration logic");
       setDeleteMediaStatus("delete-loading")
       await deleteMediaFromTask(activeTask?._id,activeMedia?.mediaURL).then((res:any)=>{
-        console.log("(inreact)DELETE MEDIA BY ID RESULT : ",res)
         if(res?.deleteStatus){
           setDeleteMediaStatus("delete-success")
           triggerRerender()
@@ -21,7 +19,6 @@ function DeleteTaskMediaConfirmationModal(props:any) {
             setDeleteMediaStatus("delete-failure")
         }
       }).catch((err:any)=>{
-        console.log("(inreact)DELETE MEDIA BY ID ERROR :",err)
         setDeleteMediaStatus("delete-failure")
       })
     }

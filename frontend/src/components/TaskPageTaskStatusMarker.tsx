@@ -4,6 +4,7 @@ import { colors } from "../Constants";
 import ErrorBox from "../common/ErrorBox";
 import NoDataMessage from "../common/NoDataMessage";
 import {addCommentToTaskById } from "../services/taskServices";
+import { errorMessage } from "../services/apiClient";
 import moment from "moment";
 
 function TaskPageTaskStatusMarker(props: any) {
@@ -23,12 +24,7 @@ function TaskPageTaskStatusMarker(props: any) {
     return () => clearTimeout(timer);
   }, [error]);
 
-  const emptyState = {
-    senderName: `${myProfiledata?.firstName} ${myProfiledata?.lastName}`,
-    messageContent: "",
-    senderId: myProfiledata?._id,
-    timeStamp: moment.utc().toISOString(),
-  };
+  const emptyState = { messageContent: "" };
 
   const [taskCommentFormData, setTaskCommentFormData] = useState(emptyState);
 
@@ -48,28 +44,16 @@ function TaskPageTaskStatusMarker(props: any) {
   };
 
   const handleSubmit = async () => {
+    if (!validateBeforeSubmit()) return;
     setPostCommentStatus("post-loading");
-    if (validateBeforeSubmit()) {
-      console.log("Perform Comment Posting logic");
-      await addCommentToTaskById(activeTask?._id, taskCommentFormData)
-        .then((res: any) => {
-          console.log("(INREACT) ADD COMMENT RESULT :", res);
-          if (res.addStatus) {
-            setPostCommentStatus("not-posted");
-            triggerRerender();
-          } else {
-            console.log("(INREACT)ADD COMMENT ERROR", res);
-            setError("Comment Could Not be Posted");
-            setTaskCommentFormData(emptyState);
-          }
-        })
-        .catch((err: any) => {
-          console.log("(INREACT) in catch ADD COMMENT ERROR", err);
-        });
-
+    const res: any = await addCommentToTaskById(activeTask?._id, taskCommentFormData);
+    if (res?.addStatus) {
+      setPostCommentStatus("not-posted");
       setTaskCommentFormData(emptyState);
+      triggerRerender();
     } else {
-      console.error("Validation failed. Display error message.");
+      setError(errorMessage(res, "Comment Could Not be Posted"));
+      setPostCommentStatus("post-failure");
     }
   };
 
@@ -91,7 +75,7 @@ function TaskPageTaskStatusMarker(props: any) {
 
           <div className="flex flex-col gap-3 my-1 bg-gray-50 min-h-[200px] items-center md:min-h-[300px] overflow-y-auto p-2 max-h-[300px]" ref={commentsContainerRef}>
             {activeTask?.taskComments.map((node: any) => (
-              <>
+              <React.Fragment key={node._id}>
                 {node?.senderId === myProfiledata?._id ? (
                   <div className="flex flex-col group text-[12px] max-w-full break-words hover:bg-C44 cursor-pointer transition-all p-2 w-full border-r-4 hover:border-C11 ">
                     <div
@@ -131,7 +115,7 @@ function TaskPageTaskStatusMarker(props: any) {
                     </div>
                   </div>
                 )}
-              </>
+              </React.Fragment>
             ))}
 
             {activeTask?.taskComments.length === 0 && (
@@ -155,9 +139,7 @@ function TaskPageTaskStatusMarker(props: any) {
             id="messageContent"
             value={taskCommentFormData.messageContent}
             onChange={handleInputChange}
-          >
-            taskCommentFormData.messageContent
-          </textarea>
+          />
           <div className="flex justify-end py-2">
             <button
               disabled={postCommentStatus === "post-loading"?true:false}

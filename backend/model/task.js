@@ -1,61 +1,22 @@
-// define the task schema
 const mongoose = require("mongoose");
+const { mediaSchema } = require("./media");
 
-const taskSchema = new mongoose.Schema({
-  taskTitle: {
-    type: String,
-    required: true,
+const taskSchema = new mongoose.Schema(
+  {
+    taskTitle: { type: String, required: true, trim: true },
+    taskDescription: { type: String, default: "" },
+    taskPriority: { type: String, enum: ["High", "Medium", "Low"], default: "Medium" },
+    project: { type: mongoose.Schema.Types.ObjectId, ref: "Project", required: true, index: true },
+    assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    taskStatus: { type: String, enum: ["In Progress", "Completed"], default: "In Progress" },
+    // Kept as strings for compatibility with the existing UI date handling.
+    dueDate: { type: String },
+    assignedOn: { type: String },
+    attachedMediaURLSet: [mediaSchema],
+    taskComments: [{ type: mongoose.Schema.Types.ObjectId, ref: "Comment" }],
   },
-  taskDescription: {
-    type: String,
-  },
-  taskPriority:{
-    type:String,
-    enum:['High','Medium','Low']
-  },
-  project: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Project',
-    required: true,
-  },
-  assignedBy:{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  },
-  assignedTo: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  },
-  taskStatus: {
-    type: String,
-    enum: ['In Progress', 'Completed'],
-    default: 'In Progress',
-  },
-  dueDate: {
-    type: String,
-  },
-  assignedOn:{
-    type:String
-  },
-  attachedMediaURLSet:[
-    {
-      mediaType :{type:String},
-      mediaURL : {type:String},
-      mediaName:{type:String},
-      mediaSize:{type:Number}
-    }
-  ],
-  
-  taskComments:[{
-       type: mongoose.Schema.Types.ObjectId,
-       ref: 'Comment'
-      }]
-  
-  // Add any additional task-related fields here
-});
+  { timestamps: true }
+);
 
-const Task = mongoose.model("Task", taskSchema);
-
-module.exports = Task;
+module.exports = mongoose.model("Task", taskSchema);

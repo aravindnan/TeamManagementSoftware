@@ -10,20 +10,16 @@ function RemoveMemberConfirmationModal(props:any) {
 
     const handleRemove=async()=>{
       setDeleteMemberStatus("delete-loading")
-      console.log("SELECTED MEMBER DATA ID",memberData?._id);
       const userData = {
         memberId:memberData?._id
       }
-      console.log("MEMBERID IN REMOVE PERSON",userData)
       await deleteMemberFromProject(activeProject._id,userData).then((res:any)=>{
         if(res?.deleteStatus){
           setDeleteMemberStatus("delete-success")
           triggerRerender()
         }
-        console.log("(inreact) DELETE MEMBER FROM PROJECT RESULT",res)
       }).catch((err:any)=>{
         setDeleteMemberStatus("delete-failure")
-        console.log("(inreact) ERROR in DELETE MEMEBER FROM PROJECT",err)
       })
     }
 

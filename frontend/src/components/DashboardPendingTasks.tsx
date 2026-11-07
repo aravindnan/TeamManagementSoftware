@@ -7,7 +7,6 @@ import moment from "moment";
 
 function DashboardPendingTasks(props:any) {
   const {allTasks}=props
-  console.log("PENDING TASKS : ",allTasks);
 
   return (
     <>

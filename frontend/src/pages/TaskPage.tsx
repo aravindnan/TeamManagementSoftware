@@ -1,9 +1,8 @@
-import { AccountCircle, Logout } from "@mui/icons-material";
-import { Tooltip } from "@mui/material";
+
+
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { colors } from "../Constants";
-import Logo from "../common/Logo";
+import { useNavigate } from "react-router-dom";
+
 import TaskPageTaskInfo from "../components/TaskPageTaskInfo";
 import TaskPageAttachedMedia from "../components/TaskPageAttachedMedia";
 import TaskPageTaskStatusMarker from "../components/TaskPageTaskStatusMarker";
@@ -14,8 +13,7 @@ import ViewMediaModal from "../modals/ViewMediaModal";
 import DeleteTaskConfirmationModal from "../modals/DeleteTaskConfirmationModal";
 import ViewMemberModal from "../modals/ViewMemberModal";
 import TaskPageAddMediaModal from "../modals/TaskPageAddMediaModal";
-import { getUserDetailsFromToken } from "../services/authServices";
-import { getUserById } from "../services/userServices";
+import { getMe } from "../services/authServices";
 import { useDispatch, useSelector } from "react-redux";
 import * as authActions from "../redux/actions/authActions"
 import { getTaskById } from "../services/taskServices";
@@ -46,31 +44,19 @@ function TaskPage() {
   },[activeTask])
 
   useEffect(() => {
-    const existingUser:any = getUserDetailsFromToken()
-    console.log("EXISITING USER ID : ",existingUser)
-
-    if (existingUser?._id) {
-       getMyProfileData(existingUser._id)
-    }
-    else{
-      navigate("/login") 
-    }
+    getMyProfileData()
   }, []);
-  const getMyProfileData =async(myUserId:any)=>{
-    await getUserById(myUserId).then((res:any)=>{
-      console.log("in DAHBOARD FUNCTION: ",res);
-      if(res.code==="ERR_NETWORK"){
-        setNetworkError(true)
-        console.log("NETWORK ERROR ") 
-      }else{
 
-        dispatch(authActions.loginAction(res))
-      }
-    }).catch((err:any)=>{
-      setNetworkError(true)
-      console.log("NETWORK ERROR ",err) 
-    })
-}
+  const getMyProfileData = async () => {
+    const res: any = await getMe()
+    if (res === null) {
+      navigate("/login")
+    } else if (res?._id) {
+      dispatch(authActions.loginAction(res))
+    } else {
+      setNetworkError(res?.code === "ERR_NETWORK")
+    }
+  }
     
   const myProfiledata = useSelector(
     (state: any) => state.authReducer.myUserProfile
@@ -78,33 +64,25 @@ function TaskPage() {
 
   useEffect(() => {
     const queryString = window.location.search;
-    console.log(queryString);
     let urlParams = new URLSearchParams(queryString);
     const taskId = urlParams.get("id");
-    console.log("TaskID in TASKPAGE : ", taskId);
     if (taskId) {
       getTaskData(taskId)
     }
     else{
-      navigate("*")
+      navigate("/not-found", { replace: true })
     }
   }, [rerender]);
 
-  const getTaskData=async(taskId:any)=>{
-    await getTaskById(taskId).then((res:any)=>{
-      console.log("in TASKPAGE RETURNED TASK ",res.code);
-      if(res.code==="ERR_NETWORK"){
-        setNetworkError(true)
-        console.log("NETWORK ERROR ")
-        setPageLoading("error")
-      }
-      else{
-        setPageLoading("loaded")
-        setActiveTask(res)
-      }
-    }).catch((err:any)=>{
-      console.log(err)
-    })
+  const getTaskData = async (taskId: string) => {
+    const res: any = await getTaskById(taskId)
+    if (res?._id) {
+      setPageLoading("loaded")
+      setActiveTask(res)
+    } else {
+      setNetworkError(res?.code === "ERR_NETWORK")
+      setPageLoading("error")
+    }
   }
 
   const triggerRerender = () => {

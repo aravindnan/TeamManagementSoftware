@@ -1,10 +1,8 @@
 import { Close } from '@mui/icons-material'
-import React, { useEffect, useState } from 'react'
-import { getUserDetailsFromToken, logoutUser } from '../services/authServices'
+import React, { useState } from 'react'
+import { logoutUser } from '../services/authServices'
 import { useNavigate } from 'react-router'
-import ErrorBox from '../common/ErrorBox'
 import APIResponseStatus from '../common/APIResponseStatus'
-import MagicLoader from '../common/MagicLoader'
 import * as authActions from "../redux/actions/authActions"
 import { useDispatch } from 'react-redux'
 
@@ -24,28 +22,18 @@ function LogoutModal(props:any) {
     }
 
 
-    const handleLogout= async()=>{
+    const handleLogout = async () => {
       setLogoutStatus("logout-loading")
-      const userData:any = getUserDetailsFromToken()
-      if(userData){
-        await logoutUser(userData?._id).then((res:any)=>{
-          console.log("Logout Response In REACT : ",res)
-          setLogoutStatus("logout-success")
-          dispatch(authActions.logoutAction())
-          navigate("/")
-        }).catch((err:any)=>{
-            setError("Logout Failed")
-            console.log("Error : ",err);
-            setLogoutStatus("not-loggedout")
-        });   
+      const res: any = await logoutUser()
+      if (res?.logoutStatus) {
+        setLogoutStatus("logout-success")
+        dispatch(authActions.logoutAction())
+        navigate("/")
+      } else {
+        setError("Logout Failed")
+        setLogoutStatus("not-loggedout")
       }
-      else{
-        console.log(userData);  
-        
-      }
-      
     }
-
 
 
   return (

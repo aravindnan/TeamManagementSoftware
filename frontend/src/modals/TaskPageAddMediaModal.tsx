@@ -1,10 +1,10 @@
-import { AttachFile, AudioFile, Close, FolderZip, Image, InsertDriveFile, UploadFile, VideoFile } from '@mui/icons-material';
+import { AttachFile, Close, FolderZip, Image, InsertDriveFile, UploadFile } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import React, { useEffect, useRef, useState } from 'react'
 import ErrorBox from '../common/ErrorBox';
-import axios from 'axios';
-import { CLOUDINARY_CLOUDNAME } from '../env/environment';
 import { addMediaToTask } from '../services/taskServices';
+import { uploadFiles } from '../services/uploadServices';
+import { errorMessage } from '../services/apiClient';
 import { acceptedFileTypes } from '../Constants';
 
 function TaskPageAddMediaModal(props:any) {
@@ -28,7 +28,6 @@ function TaskPageAddMediaModal(props:any) {
     if (fileInput.files.length > 0) {
       setFileList((prevList: any) => [...prevList, ...fileInput.files]);
     }
-    console.log("FILE ADDED")
   };
 
   const removeItemFromFileList = (node: any) => {
@@ -41,76 +40,29 @@ function TaskPageAddMediaModal(props:any) {
     setAddMediaModal(false);
   };
 
-  const uploadToCloudinary = async()=>{
-    try {
-      const uploadPromises = fileList.map(async (file: any) => {
-        const data = new FormData();
-        data.append("file", file);
-        data.append("upload_preset", "image_preset");
-  
-        const response = await axios.post(
-          `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUDNAME}/auto/upload`,
-          data
-        );
-  
-        return {
-          mediaType: file.type,
-          mediaURL: response.data.secure_url,
-          mediaName: file.name,
-          mediaSize: file.size,
-        };
-      });
-  
-      // Wait for all uploads to complete before returning
-      const uploadedMediaData = await Promise.all(uploadPromises);
-  
-      return uploadedMediaData;
-    } catch (error:any) {
-      console.log("ERROR IN UPLOADING TO CLOUDINARY", error);
-      setLoading(false);
-      setError(error?.message || "Could not Upload To Cloud");
-    }
-}
-
   const handleSubmit = async () => {
-
-    if(fileList.length===0){
-      setError("Add atleast one media")
+    if (fileList.length === 0) {
+      setError("Add atleast one media");
+      return;
     }
-    else{
-      setLoading(true);
-      try {
-        await uploadToCloudinary().then(async(res:any)=>{
-          console.log("MEDIA UPLOAD RESULT : ",res)
-          await addMediaToTask(activeTask?._id,res).then((res:any)=>{
-            console.log("(INREACT) UPLOAD MEDIA RESULT: ", res);
-            if(res.addSuccess){
-              setLoading(false);
-              setFileList([]);
-              setAddMediaModal(false);
-              triggerRerender();
-            }
-            else{
-              setLoading(false);
-              setError("Something went wrong");
-            }
-    
-          }).catch((err:any)=>{
-            setLoading(false);
-            console.log("(INREACT) UPLOAD MEDIA ERROR: ", err);
-    
-          })
-        }).catch((err:any)=>{
-          setLoading(false);
-          console.log("MEDIA UPLOAD ERROR INCLOUDINARY : ",err)
-        })
-  
-      } catch (err:any) {
-        setLoading(false);
-        setError(err?.message || "Something went wrong");
+    setLoading(true);
+    try {
+      const uploaded = await uploadFiles(fileList);
+      const res: any = await addMediaToTask(activeTask?._id, uploaded);
+      if (res?.addSuccess) {
+        setFileList([]);
+        setAddMediaModal(false);
+        triggerRerender();
+      } else {
+        setError(errorMessage(res, "Could not attach the media to the task"));
       }
+    } catch (err: any) {
+      setError(err?.response?.data?.error?.message || err?.message || "Could not upload the files");
+    } finally {
+      setLoading(false);
     }
   };
+
   
     return (
       <div className="top-0 left-0 absolute w-[100vw] h-[100vh] bg-[#00000054] flex justify-center items-center">

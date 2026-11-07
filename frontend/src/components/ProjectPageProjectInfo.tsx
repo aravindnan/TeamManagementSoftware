@@ -6,15 +6,13 @@ import {
   DonutLarge,
   Edit,
   Person,
-  Tune,
-} from "@mui/icons-material";
-import React, { useState } from "react";
+  } from "@mui/icons-material";
+import React, {} from "react";
 import { colors } from "../Constants";
 import "react-circular-progressbar/dist/styles.css";
 import CircularGraph from "../common/CircularGraph";
 import { Tooltip } from "@mui/material";
-import AddNewTaskModal from "../modals/AddNewTaskModal";
-import { log } from "console";
+
 import { useSelector } from "react-redux";
 import moment from "moment";
 

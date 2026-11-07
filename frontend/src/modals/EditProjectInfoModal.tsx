@@ -1,6 +1,5 @@
-import { Add, Close } from "@mui/icons-material";
+import { Close } from "@mui/icons-material";
 import React, { useEffect, useState } from "react";
-import { projectMembers } from "../data/data";
 import ErrorBox from "../common/ErrorBox";
 import { editProjectById } from "../services/projectServices";
 import APIResponseStatus from "../common/APIResponseStatus";
@@ -59,9 +58,7 @@ function EditProjectInfoModal(props: any) {
     if (validateBeforeSubmit()) {
       setEditProjectStatus("edit-loading")
       // Perform registration logic here call API
-      console.log("Perform registration logic");
       await editProjectById(activeProject?._id,editProjectFormData).then((res:any)=>{
-        console.log("(inreact)EDIT PROJECT BY ID RESULT : ",res)
         if(res.status){
           setEditProjectStatus("edit-success")
           triggerRerender()
@@ -74,7 +71,6 @@ function EditProjectInfoModal(props: any) {
       // setAddNewTaskFormData(emptyState);
     } else {
       // Display error message
-      console.error("Validation failed. Display error message.");
     }
   };
 

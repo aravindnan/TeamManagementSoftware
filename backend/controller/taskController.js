@@ -1,290 +1,81 @@
-const Task = require("../model/task")
-const User = require("../model/user")
-const Project = require("../model/project")
-const Comment = require('../model/comment');
-const multer = require("multer")
+const Task = require("../model/task");
+const User = require("../model/user");
+const Project = require("../model/project");
+const Comment = require("../model/comment");
+const asyncHandler = require("../utils/asyncHandler");
+const { notFound, forbidden } = require("../utils/AppError");
+const { PUBLIC_USER_FIELDS, idEq, isManager, loadTaskForMember } = require("../utils/access");
+const { deleteTasksCascade } = require("../utils/cascade");
 
+const isOwnerOfTask = (task, project, userId) =>
+  isManager(project, userId) || idEq(task.assignedBy, userId) || idEq(task.assignedTo, userId);
 
+exports.get_task_by_id = asyncHandler(async (req, res) => {
+  await loadTaskForMember(req.params.taskId, req.user.id);
+  const task = await Task.findById(req.params.taskId)
+    .populate("project")
+    .populate("assignedBy", PUBLIC_USER_FIELDS)
+    .populate("assignedTo", PUBLIC_USER_FIELDS)
+    .populate("taskComments");
+  res.status(200).json(task);
+});
 
-exports.get_all_tasks = async (req,res)=>{
-    try {
-        // Fetch all tasks from the database
-        const tasks = await Task.find();
-    
-        // Respond with the fetched tasks
-        res.status(200).json(tasks);
-      } catch (error) {
-        console.error(error);
-        // Handle errors appropriately
-        res.status(500).json({ error: 'Internal Server Error' });
-      }}
+exports.edit_task_by_id = asyncHandler(async (req, res) => {
+  const { task, project } = await loadTaskForMember(req.params.taskId, req.user.id);
+  if (!isOwnerOfTask(task, project, req.user.id)) throw forbidden("You cannot edit this task");
+  const { taskTitle, taskDescription, taskPriority, taskStatus, dueDate } = req.body;
+  Object.assign(task, { taskTitle, taskDescription, taskPriority, taskStatus });
+  if (dueDate !== undefined) task.dueDate = dueDate;
+  await task.save();
+  res.status(200).json({ message: "Task edited successfully", editStatus: true });
+});
 
-exports.get_task_by_id = async(req,res)=>{
-    try {
-        const taskId = req.params.taskId; // Use req.params to get the task ID from the URL
-    
-        // Find the task in the database based on the provided task ID
-        const task = await Task.findById(taskId)
-        .populate('project')
-        .populate('assignedBy')
-        .populate('assignedTo')
-        .populate('taskComments')
-       
-       
-        if (!task) {
-          // If the task is not found, respond with a 404 status
-          return res.status(404).json({ error: 'Task not found' });
-        }
-    
-        // Respond with the fetched task
-        res.status(200).json(task);
-      } catch (error) {
-        console.error(error);
-        // Handle errors appropriately
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-}
+exports.change_task_status_by_id = asyncHandler(async (req, res) => {
+  const { task, project } = await loadTaskForMember(req.params.taskId, req.user.id);
+  if (!isOwnerOfTask(task, project, req.user.id)) throw forbidden("You cannot change this task's status");
+  task.taskStatus = req.body.newStatus;
+  await task.save();
+  res.status(200).json({ message: "Task status changed successfully", updateStatus: true });
+});
 
+exports.add_comment_by_task_id = asyncHandler(async (req, res) => {
+  const { task } = await loadTaskForMember(req.params.taskId, req.user.id);
+  const sender = await User.findById(req.user.id).select("firstName lastName");
+  const comment = await Comment.create({
+    senderName: `${sender.firstName} ${sender.lastName}`.trim(),
+    senderId: req.user.id,
+    messageContent: req.body.messageContent,
+  });
+  await Task.updateOne({ _id: task._id }, { $push: { taskComments: comment._id } });
+  res.status(200).json({ message: "Comment added successfully", comment, addStatus: true });
+});
 
-exports.edit_task_by_id= async(req,res)=>{
-  try {
-    const taskId = req.params.taskId;
-    const { taskTitle, taskDescription, dueDate,taskStatus,taskPriority} = req.body;
-
-    // Implement the logic to edit the task in the database
-    // Use the Task model and its findOneAndUpdate method
-    // const editedTask = await Task.findOneAndUpdate(
-    //   {  _id: taskId },
-    //   { title, description, details, dueDate },
-    //   { new: true } // This option ensures you get the updated document in the response
-    // );
-
-    const task = await Task.findById(taskId);
-    if (!task) {
-      return res.status(404).json({ error: "Task not found" ,status:false});
-    }
-
-    // Update project properties with the new values
-    task.taskTitle = taskTitle;
-    task.taskDescription = taskDescription;
-    task.taskStatus = taskStatus;
-    task.dueDate = dueDate
-    task.taskPriority = taskPriority
-
-    const editedTask = await task.save()
-
-    if (!editedTask) {
-      // Handle the case where the task with the given ID is not found
-      return res.status(404).json({ error: "Task not found",editStatus: false });
-    }
-
-    // Respond with the edited task or any relevant information
-    res.status(200).json({ message: "Task edited successfully", editStatus: true });
-  } catch (error) {
-    console.error(error);
-    // Handle any internal server error
-    res.status(500).json({ error: "Internal Server Error",editStatus: true });
+exports.delete_task_by_id = asyncHandler(async (req, res) => {
+  const { task, project } = await loadTaskForMember(req.params.taskId, req.user.id);
+  if (!isManager(project, req.user.id) && !idEq(task.assignedBy, req.user.id)) {
+    throw forbidden("Only the project manager or the task creator can delete this task");
   }
-  
-}
+  await Project.updateOne({ _id: task.project }, { $pull: { allTasks: task._id } });
+  await Comment.deleteMany({ _id: { $in: task.taskComments } });
+  await deleteTasksCascade([task._id]);
+  res.status(200).json({ message: "Task deleted successfully", deleteStatus: true });
+});
 
-exports.add_comment_by_task_id= async(req,res)=>{
-  try {
-    const taskId = req.params.taskId;
-    const { senderName, messageContent, senderId,timeStamp } = req.body;
+exports.add_new_media_to_task = asyncHandler(async (req, res) => {
+  const { task } = await loadTaskForMember(req.params.taskId, req.user.id);
+  const items = req.body.mediaDataArray.map((m) => ({ ...m, uploadedBy: req.user.id }));
+  await Task.updateOne({ _id: task._id }, { $push: { attachedMediaURLSet: { $each: items } } });
+  res.status(200).json({ message: "Media added to Task", addSuccess: true });
+});
 
-    // Create a new comment
-    const newComment = new Comment({
-      senderName:senderName,
-      messageContent:messageContent,
-      senderId:senderId,
-      timeStamp: new Date()
-    });
-
-    await newComment.save()
-
-    // Implement the logic to add the comment to the task in the database
-    // Use the Task model and its findOneAndUpdate method
-    const updatedTask = await Task.findByIdAndUpdate(
-      taskId,
-      {
-        $push: {
-          taskComments: newComment._id,
-        },
-      },
-      { new: true } // This option ensures you get the updated document in the response
-    );
-
-    if (!updatedTask) {
-      // Handle the case where the task with the given ID is not found
-      return res.status(404).json({ error: "Task not found",addStatus:false });
-    }
-
-    // Respond with the updated task or any relevant information
-    res.status(200).json({ message: "Comment added successfully", task: updatedTask ,addStatus:true });
-  } catch (error) {
-    console.error(error);
-    // Handle any internal server error
-    res.status(500).json({ error: "Internal Server Error" ,addStatus:false  });
+exports.remove_media_from_task = asyncHandler(async (req, res) => {
+  const { task, project } = await loadTaskForMember(req.params.taskId, req.user.id);
+  const item = task.attachedMediaURLSet.find((m) => m.mediaURL === req.body.mediaURL);
+  if (!item) throw notFound("Media not found in task");
+  if (!isOwnerOfTask(task, project, req.user.id) && !(item.uploadedBy && idEq(item.uploadedBy, req.user.id))) {
+    throw forbidden("You cannot remove this file");
   }
-
-  
-}
-
-exports.change_task_status_by_id= async(req,res)=>{
-  try {
-    const taskId = req.params.taskId;
-    const { newStatus } = req.body;
-
-    // Implement the logic to change the task status in the database
-    // Use the Task model and its findOneAndUpdate method
-    const updatedTask = await Task.findOneAndUpdate(
-      { _id: taskId },
-      { $set: { taskStatus: newStatus } },
-      { new: true } // This option ensures you get the updated document in the response
-    );
-
-    if (!updatedTask) {
-      // Handle the case where the task with the given ID is not found
-      return res.status(404).json({ error: "Task not found" , updateStatus: false});
-    }
-
-    // Respond with the updated task or any relevant information
-    res.status(200).json({ message: "Task status changed successfully", updateStatus: true });
-  } catch (error) {
-    console.error(error);
-    // Handle any internal server error
-    res.status(500).json({ error: "Internal Server Error" , updateStatus: false});
-  }
-  
-}
-
-exports.delete_task_by_id = async(req,res)=>{
-  try {
-    const taskId = req.params.taskId;
-
-    // Find the task to get information before deleting
-    const taskToDelete = await Task.findById(taskId);
-
-    if (!taskToDelete) {
-      return res.status(404).json({ error: "Task not found", deleteStatus: false });
-    }
-
-    // Delete the task from the database
-     await Task.findByIdAndDelete(taskId);
-
-    // Remove the task from the project's allTasks array
-    const projectUpdate = await Project.findByIdAndUpdate(
-      taskToDelete.project,
-      { $pull: { allTasks: taskId } },
-      { new: true }
-    );
-
-    if (!projectUpdate) {
-      return res.status(500).json({ error: "Failed to update project", deleteStatus: false });
-    }
-
-    // Remove the task from the user's allTasks array
-    const userUpdate = await User.findByIdAndUpdate(
-      taskToDelete.assignedTo,
-      { $pull: { allTasks: taskId } },
-      { new: true }
-    );
-
-    if (!userUpdate) {
-      return res.status(500).json({ error: "Failed to update user", deleteStatus: false });
-    }
-
-    // Respond with a success message or any relevant information
-    res.status(200).json({ message: "Task deleted successfully", deleteStatus: true });
-  } catch (error) {
-    console.error(error);
-    // Handle any internal server error
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-  
-}
-
-
-exports.delete_all_tasks = async (req, res) => {
-  try {
-    console.log("delete all task called");
-    await Task.deleteMany();
-    res.status(200).json({ message: 'All tasks deleted successfully' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-};
-
-
-exports.add_new_media_to_project=async(req,res)=>{
-  try {
-    const taskId = req.params.taskId;
-    const {mediaDataArray} = req.body; // Assuming the URL is sent in the request body
-
-    console.log("MEDIA ARRAY IN BACKEND : ",mediaDataArray)
-    // Validate if taskID and mediaUrl are provided
-    // Find the task by taskId
-    const task = await Task.findById(taskId);
-
-    // Check if the task exists
-    if (!task) {
-      return res.status(404).json({ message: 'Task not found',addSuccess:false });
-    }
-
-    // Append the mediaUrl to the attachedMediaURLSet array
-    task.attachedMediaURLSet.push(...mediaDataArray);
-
-
-    // Save the updated project
-    await task.save()
-
-    res.status(200).json({ message: 'Media added to Task', addSuccess:true });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Internal Server Error',addSuccess:false });
-  }
-}
-
-exports.remove_media_from_task = async(req,res)=>{
-  // this should remove the media that particular task  has from its database as well as from cloudinary
-  try {
-    const taskId = req.params.taskId;
-    const mediaURLToRemove = req.body.mediaURL; // Assuming you send the media URL as a parameter
-  
-    console.log("MEDIA URL TO REMOVE  :",mediaURLToRemove)
-  
-    // Check if the task exists
-    const task = await Task.findById(taskId);
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found', deleteStatus: false });
-    }
-  
-    // Find the index of the media item to remove
-    const mediaIndex = task.attachedMediaURLSet.findIndex((mediaItem) => mediaItem.mediaURL === mediaURLToRemove);
-  
-    // If the media item is found, remove it from the set
-    if (mediaIndex !== -1) {
-      task.attachedMediaURLSet.splice(mediaIndex, 1);
-    } else {
-      return res.status(404).json({ error: 'Media not found in task',  deleteStatus: false });
-    }
-  
-    // Save the updated task
-    await task.save();
-  
-    // Respond with success or any relevant information
-    res.status(200).json({ message: 'Media removed from task successfully',  deleteStatus: true });
-  } catch (error) {
-    console.error(error);
-    // Handle any internal server error
-    res.status(500).json({ error: 'Internal Server Error',  deleteStatus: false });
-  }
-}
-  
-
-
-
-
-
+  item.deleteOne();
+  await task.save();
+  res.status(200).json({ message: "Media removed from task successfully", deleteStatus: true });
+});

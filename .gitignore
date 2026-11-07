@@ -1,0 +1,13 @@
+node_modules/
+build/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+uploads/
+*.log
+.DS_Store
+*.bkp
+documentation/dummy.txt
+design/PhotsofUI.zip

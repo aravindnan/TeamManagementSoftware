@@ -1,85 +1,19 @@
-import axios from "axios"
-import { ENV } from "../env/environment"
+import { api, call } from "./apiClient";
 
-export const getTaskById =async(taskId:any)=>{
-    let taskData
-    await axios.get(`${ENV}/get-task-by-id/${taskId}`).then((res:any)=>{
-        console.log("(inservice)RESPONSE TO GET TASK BY ID : ",res.data)
-        taskData = res.data
-    }).catch((err:any)=>{
-        console.log("(inservice)ERROR TO GET TASK BY ID : ",err)
-        taskData=err
-    })
-    return taskData
-}
+export const getTaskById = (taskId: string) => call(api.get(`/get-task-by-id/${taskId}`));
 
-export const editTaskById = async(taskId:string,newTaskData:any)=>{
-    let editTaskResult
-    await axios.put(`${ENV}/edit-task-by-id/${taskId}`,newTaskData).then((res:any)=>{
-        console.log("(inservice)RESPONSE TO EDIT TASK BY ID : ",res.data)
-        editTaskResult = res.data
-    }).catch((err:any)=>{
-        console.log("(inservice)ERROR TO EDIT TASK BY ID : ",err)
-        editTaskResult=err
-    })
-    return editTaskResult
-}
+export const editTaskById = (taskId: string, newTaskData: any) => call(api.put(`/edit-task-by-id/${taskId}`, newTaskData));
 
-export const deleteTaskById = async(taskId:string)=>{
-    let deleteTaskResult
-    await axios.delete(`${ENV}/delete-task-by-id/${taskId}`).then((res:any)=>{
-        console.log("(inservice)RESPONSE TO EDIT TASK BY ID : ",res.data)
-        deleteTaskResult = res.data
-    }).catch((err:any)=>{
-        console.log("(inservice)ERROR TO EDIT TASK BY ID : ",err)
-    })
-    return deleteTaskResult
-}
+export const deleteTaskById = (taskId: string) => call(api.delete(`/delete-task-by-id/${taskId}`));
 
-export const changeTaskStatus = async(taskId:string,status:string)=>{
-    let changeTaskStatusResult
-    await axios.put(`${ENV}/change-task-status-by-id/${taskId}`,{newStatus:status}).then((res:any)=>{
-        console.log("(inservice)RESPONSE TO CHANGE TASK STATUS BY ID : ",res.data)
-        changeTaskStatusResult = res.data
-    }).catch((err:any)=>{
-        console.log("(inservice)ERROR TO CHANGE TASK STATUS BY ID : ",err)
-    })
-    return changeTaskStatusResult
-}
+export const changeTaskStatus = (taskId: string, status: string) =>
+  call(api.put(`/change-task-status-by-id/${taskId}`, { newStatus: status }));
 
-export const addCommentToTaskById = async(taskId:string,commentData:any)=>{
-    let addCommentResult
-    await axios.post(`${ENV}/add-comment-to-task-by-id/${taskId}`,commentData).then((res:any)=>{
-        addCommentResult = res.data
-        console.log("(inservice) ADD COMMENT RESULT :",res.data)
-    }).catch((err:any)=>{
-        addCommentResult = err
-        console.log("(inservice) ADD COMMENT ERROR :",err)
-    })
-    return addCommentResult
-}
+export const addCommentToTaskById = (taskId: string, commentData: { messageContent: string }) =>
+  call(api.post(`/add-comment-to-task-by-id/${taskId}`, { messageContent: commentData.messageContent }));
 
+export const addMediaToTask = (taskId: string, mediaDataArray: any[]) =>
+  call(api.post(`/add-media-to-task/${taskId}`, { mediaDataArray }));
 
-export const  addMediaToTask = async(taskId:string,mediaDataArray:any)=>{
-    let mediaUploadResult
-    await axios.post(`${ENV}/add-media-to-task/${taskId}`,{mediaDataArray:mediaDataArray}).then((res:any)=>{
-        mediaUploadResult = res.data
-        console.log("(INSERVICE) UPLOAD MEDIA RESPONSE",res)
-    }).catch((err:any)=>{
-        mediaUploadResult = err
-        console.log("(INSERVICE) UPLOAD MEDIA ERROR",err)
-    })
-    return mediaUploadResult
-}
-
-export const  deleteMediaFromTask = async(taskId:string,mediaURL:any)=>{
-    let mediaDeleteResult
-    await axios.delete(`${ENV}/remove-media-from-task/${taskId}`,{data:{mediaURL}}).then((res:any)=>{
-        mediaDeleteResult = res.data
-        console.log("(INSERVICE) DELETE MEDIA RESPONSE",res)
-    }).catch((err:any)=>{
-        mediaDeleteResult = err
-        console.log("(INSERVICE) DELETE MEDIA ERROR",err)
-    })
-    return mediaDeleteResult
-}
+export const deleteMediaFromTask = (taskId: string, mediaURL: string) =>
+  call(api.delete(`/remove-media-from-task/${taskId}`, { data: { mediaURL } }));

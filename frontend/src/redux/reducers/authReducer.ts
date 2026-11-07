@@ -23,19 +23,3 @@ export const authReducer=(state=authInitialState,action:any)=>{
       return state;
   }
 }
-
-// export const userReducer=(state=initialState,action:any)=>{
-//     switch(action.type){
-
-
-// }}
-
-// export const projectReducer=(state=initialState,action:any)=>{
-//     switch(action.type){
-
-// }}
-
-// export const taskReducer=(state=initialState,action:any)=>{
-//     switch(action.type){
-
-// }}

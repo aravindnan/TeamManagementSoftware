@@ -4,7 +4,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { colors } from "../Constants";
 import { ArrowForwardRounded, ReplayRounded, RestartAltRounded, Visibility, VisibilityOff } from "@mui/icons-material";
 import ErrorBox from "../common/ErrorBox";
-import { getUserDetailsFromToken, registerUser } from "../services/authServices";
+import { getMe, registerUser } from "../services/authServices";
+import { errorMessage } from "../services/apiClient";
 import APIResponseStatus from "../common/APIResponseStatus";
 import { Tooltip } from "@mui/material";
 import { useSelector } from "react-redux";
@@ -19,15 +20,10 @@ function Register() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    const existingUser:any = getUserDetailsFromToken()
-    console.log("EXISITING USER ID : ",existingUser)
-
-    if (existingUser?._id) {
-       navigate("/dashboard")
-    }
-    else{
-      document.title = "TMS • Sign Up";
-    }
+    document.title = "TMS • Sign Up";
+    getMe().then((me: any) => {
+      if (me?._id) navigate("/dashboard");
+    });
   }, [navigate]);
 
   const retryRegister = () => {
@@ -84,7 +80,6 @@ function Register() {
   };
 
   const validateBeforeSubmit = () => {
-    console.log(registerFormData);
 
     if (
       !registerFormData.firstName ||
@@ -132,31 +127,18 @@ function Register() {
     if (validateBeforeSubmit()) {
       setRegisterStatus("register-loading");
       // Perform registration logic here call API
-      console.log("Perform registration logic");
-      await registerUser(registerFormData)
-        .then((res: any) => {
-          if(res.registerSuccess){
-            setRegisterStatus("register-success");
-            setRegisterFormData(emptyState);
-            navigate("/login");
-          }
-          else{
-            console.log("(INREACT)ERROR REGISTER ", res.response.data.error);
-            setApiResponseMessage(res.response.data.error)
-            setRegisterStatus("register-failure");
-          }
-          console.log("Response : ", res);
-        })
-        .catch((err: any) => {
-          setRegisterStatus("register-failure")
-          setError(err.error)
-          console.log("Error : ",err);
-
-        });
-      
+      const { cpassword, ...payload } = registerFormData;
+      const res: any = await registerUser(payload);
+      if (res?.registerSuccess) {
+        setRegisterStatus("register-success");
+        setRegisterFormData(emptyState);
+        navigate("/login");
+      } else {
+        setApiResponseMessage(errorMessage(res, "Registration failed"));
+        setRegisterStatus("register-failure");
+      }
     } else {
       // Display error message
-      console.error("Validation failed. Display error message.");
     }
   };
 

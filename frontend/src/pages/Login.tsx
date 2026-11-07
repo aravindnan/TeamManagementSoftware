@@ -1,17 +1,16 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Logo from "../common/Logo";
 import { colors } from "../Constants";
 import { Link, useNavigate } from "react-router-dom";
 import ForgotPasswordModal from "../modals/ForgotPasswordModal";
 import {Visibility, VisibilityOff } from "@mui/icons-material";
 import ErrorBox from "../common/ErrorBox";
-import { getUserDetailsFromToken, loginUser } from "../services/authServices";
+import { getMe, loginUser } from "../services/authServices";
+import { errorMessage } from "../services/apiClient";
 import APIResponseStatus from "../common/APIResponseStatus";
-import MagicLoader from "../common/MagicLoader";
 import { Tooltip } from "@mui/material";
 import { useDispatch, useSelector } from "react-redux";
 import * as authActions from "../redux/actions/authActions"
-import { getUserById } from "../services/userServices";
 
 
 function Login() {
@@ -31,20 +30,15 @@ function Login() {
   }
 
   useEffect(() => {
-    const existingUser:any = getUserDetailsFromToken()
-    console.log("EXISITING USER ID : ",existingUser)
-
-    if (existingUser?._id) {
-       navigate("/dashboard")
-    }
-    else{
-      document.title = "TMS • Log In";
-    }
-  }, []);
+    document.title = "TMS • Log In";
+    // Already signed in? Skip the form.
+    getMe().then((me: any) => {
+      if (me?._id) navigate("/dashboard");
+    });
+  }, [navigate]);
 
 //   const getMyProfileData =async(myUserId:any)=>{
 //     const tempOBJ = await getUserById(myUserId)
-//     console.log("in DAHBOARD FUNCTION: ",tempOBJ);
 //     dispatch(authActions.loginAction(tempOBJ))
 // }
  
@@ -94,31 +88,18 @@ function Login() {
     if (validateBeforeSubmit()) {
       setLoginStatus("login-loading")
       // Perform registration logic here call API
-      console.log("Perform registration logic");
-      await loginUser(loginFormData).then((res:any)=>{
-        if(res.success){
-          setLoginStatus("login-success")
-          navigate(`/dashboard`)
-          console.log("Login Response : ",res);
-          setApiResponseMessage(res.message)
-          setLoginUserId(window.atob(res.userId))
-        }
-        else{
-          setLoginStatus("login-failure")
-          console.log("LOGIN FAILURE RESPONSE : ",res)
-          setApiResponseMessage(res.response.data.error)
-          
-        }
-
-      }).catch((err:any)=>{
+      const res: any = await loginUser(loginFormData)
+      if (res?.success) {
+        setLoginStatus("login-success")
+        setApiResponseMessage(res.message)
+        navigate("/dashboard")
+      } else {
         setLoginStatus("login-failure")
-        setError(err.error)
-        console.log("Error : ",err);
-      })
+        setApiResponseMessage(errorMessage(res, "Login failed"))
+      }
       setLoginFormData(emptyState);
     } else {
       // Display error message
-      console.error("Validation failed. Display error message.");
     }
   };
 

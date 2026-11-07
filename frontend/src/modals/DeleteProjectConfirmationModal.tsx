@@ -13,16 +13,13 @@ function DeleteProjectConfirmationModal(props:any) {
     }
 
     const handleDelete =async()=>{
-      // console.log("Perform registration logic");
       setDeleteProjectStatus("delete-loading")
 
       await deleteProjectById(activeProject?._id).then((res:any)=>{
-        console.log("(inreact)DELETE PROJECT BY ID RESULT : ",res)
         if(res?.deleteStatus){
           setDeleteProjectStatus("delete-success")
         }
       }).catch((err:any)=>{
-        console.log("Catch block falllllllll",err)
         setDeleteProjectStatus("delete-failure")
       })
       

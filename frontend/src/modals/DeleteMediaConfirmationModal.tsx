@@ -10,11 +10,9 @@ function DeleteMediaConfirmationModal(props:any) {
 
 
     const handleDelete =async()=>{
-      // console.log("Perform registration logic");
       setDeleteMediaStatus("delete-loading")
 
       await deleteMediaFromProject(activeProject?._id,activeMedia?.mediaURL).then((res:any)=>{
-        console.log("(inreact)DELETE MEDIA BY ID RESULT : ",res)
         if(res?.deleteStatus){
           setDeleteMediaStatus("delete-success")
           triggerRerender()
@@ -23,7 +21,6 @@ function DeleteMediaConfirmationModal(props:any) {
             setDeleteMediaStatus("delete-failure")
         }
       }).catch((err:any)=>{
-        console.log("(inreact)DELETE MEDIA BY ID ERROR :",err)
         setDeleteMediaStatus("delete-failure")
       })
     }

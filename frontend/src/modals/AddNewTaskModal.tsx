@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { projectMembers } from "../data/data";
-import { Add, Close } from "@mui/icons-material";
+import { Close } from "@mui/icons-material";
 import ErrorBox from "../common/ErrorBox";
 import { addTaskToProject } from "../services/projectServices";
 import APIResponseStatus from "../common/APIResponseStatus";
@@ -41,7 +40,6 @@ function AddNewTaskModal(props: any) {
 
   const handleInputChange = (e: any) => {
 
-    // console.log(e.target.name," : ",e.target.value)
     setAddNewTaskFormData({
       ...addNewTaskFormData,
       [e.target.name]: e.target.value,
@@ -74,7 +72,6 @@ function AddNewTaskModal(props: any) {
     return false;
   }
 
-  console.log("ACTIVE PROJECT MANAGERID IN CREATETASK MODAL : ",activeProject?.projectManager?.managerId )
   
     return true;
   };
@@ -82,13 +79,10 @@ function AddNewTaskModal(props: any) {
   const handleSubmit = async() => {
     // Add your validation logic here
 
-    console.log("SENDING DATA OF TASK : ",addNewTaskFormData);
     if (validateBeforeSubmit()) {
       // Perform registration logic here call API
       setCreateTaskStatus("create-loading")
-      console.log("Perform registration logic");
       await addTaskToProject(activeProject._id,addNewTaskFormData).then((res:any)=>{
-        console.log("TASK CREATION RESULT OBJECT IN MODAL",res)
         setCreateTaskStatus("create-success")
         setCreatedTaskId(res.taskId)
         triggerRerender()
@@ -101,7 +95,6 @@ function AddNewTaskModal(props: any) {
       // setAddNewTaskFormData(emptyState);
     } else {
       // Display error message
-      console.error("Validation failed. Display error message.");
     
     }
   };
