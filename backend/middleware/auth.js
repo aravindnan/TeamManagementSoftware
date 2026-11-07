@@ -6,7 +6,7 @@ const asyncHandler = require("../utils/asyncHandler");
 
 const cookieOptions = () => ({
   httpOnly: true,
-  secure: config.isProd || config.cookieSameSite === "none",
+  secure: config.cookieSecure || config.cookieSameSite === "none", // SameSite=None is invalid without Secure
   sameSite: config.cookieSameSite,
   path: "/",
   maxAge: config.jwtExpiresInSeconds * 1000,

@@ -26,6 +26,16 @@ cd frontend && cp .env.example .env
 npm install && npm start             # http://localhost:3000
 ```
 
+## Run with Docker
+
+```bash
+cp .env.example .env      # set JWT_SECRET (see the file for a one-liner to generate one)
+docker compose up --build
+# web: http://localhost:8080   api health: http://localhost:8000/healthz
+```
+
+The compose stack runs MongoDB, the API (non-root, health-checked) and the frontend (nginx, SPA fallback, long-cache for hashed assets). It is served over plain HTTP, so it sets `COOKIE_SECURE=false`; remove that when you put it behind HTTPS.
+
 ## Tests
 
 ```bash
@@ -39,5 +49,9 @@ cd frontend && CI=true npm test -- --watchAll=false
 - Project **manager**: edit/delete project, manage members, create tasks. Project **members**: read, comment, attach files. Task **assignee / creator / manager**: edit, change status.
 - Uploads are signed server-side (`POST /uploads/sign`); the Cloudinary secret never reaches the browser.
 - Passwords are bcrypt-hashed and never returned by any endpoint. Other users only expose public fields.
+
+## CI
+
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request: backend tests (in-memory MongoDB), frontend type check, tests and a production build (with `CI=true`, so any lint warning fails the build), then builds both Docker images and validates the compose file. Dependabot proposes weekly dependency updates.
 
 See [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md) for the full audit and roadmap.

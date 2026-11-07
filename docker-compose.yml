@@ -1,0 +1,47 @@
+# One-command local stack:  cp .env.example .env  (set JWT_SECRET)  &&  docker compose up --build
+#   web  -> http://localhost:8080
+#   api  -> http://localhost:8000/healthz
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      PORT: 8000
+      MONGO_URI: mongodb://mongo:27017/tms
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (see .env.example)}
+      CLIENT_ORIGINS: http://localhost:8080
+      # The compose stack is served over plain HTTP; drop this line when you put it behind HTTPS.
+      COOKIE_SECURE: "false"
+      CLOUDINARY_CLOUDNAME: ${CLOUDINARY_CLOUDNAME:-}
+      CLOUDINARY_APIKEY: ${CLOUDINARY_APIKEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_API_URL: ${API_PUBLIC_URL:-http://localhost:8000}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  mongo-data:

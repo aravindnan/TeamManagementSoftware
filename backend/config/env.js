@@ -26,6 +26,8 @@ module.exports = {
   jwtExpiresInSeconds: 8 * 60 * 60, // sessions slide: see middleware/auth.js
   cookieName: "tms_token",
   cookieSameSite: process.env.COOKIE_SAMESITE || "lax", // use "none" only for cross-site deployments (requires HTTPS)
+  // Secure cookies need HTTPS. Defaults to on in production; set COOKIE_SECURE=false only for plain-HTTP local runs.
+  cookieSecure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === "true" : isProd,
   clientOrigins: (process.env.CLIENT_ORIGINS || "http://localhost:3000")
     .split(",")
     .map((s) => s.trim())
