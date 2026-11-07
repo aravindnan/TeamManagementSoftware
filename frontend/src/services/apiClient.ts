@@ -4,12 +4,15 @@ import { store } from "../redux/store";
 import { logoutAction } from "../redux/actions/authActions";
 import { queryClient } from "../queries/queryClient";
 import { applyMutationEffects } from "../queries/invalidation";
+import { withRedirect } from "../helper/redirect";
 
 // One axios instance for the whole app. The session lives in an httpOnly cookie set by the API,
 // so every request just has to send credentials.
 export const api = axios.create({ baseURL: ENV, withCredentials: true, timeout: 20000 });
 
 const PUBLIC_PATHS = ["/", "/login", "/register"];
+/** Pages that work signed out. Invitation pages handle a missing session themselves, so they are not bounced to /login. */
+export const isPublicPath = (pathname: string) => PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/invite/");
 
 api.interceptors.response.use(
   (response) => {
@@ -25,7 +28,10 @@ api.interceptors.response.use(
     if (status === 401 && !isAuthCall) {
       store.dispatch(logoutAction());
       queryClient.clear(); // never keep one session's data around after it ends
-      if (!PUBLIC_PATHS.includes(window.location.pathname)) window.location.assign("/login");
+      if (!isPublicPath(window.location.pathname)) {
+        // remember where they were so signing back in returns them there
+        window.location.assign(withRedirect("/login", window.location.pathname + window.location.search));
+      }
     }
     return Promise.reject(error);
   }

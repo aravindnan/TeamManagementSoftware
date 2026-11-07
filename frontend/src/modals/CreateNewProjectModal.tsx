@@ -2,13 +2,14 @@ import React, { useEffect, useState } from "react";
 import ModalOverlay from '../common/ModalOverlay';
 import ErrorBox from "../common/ErrorBox";
 import { errorMessage } from "../services/apiClient";
+import { useWorkspaces } from "../queries/hooks";
 import { createNewProject } from "../services/projectServices";
 import { useSelector } from "react-redux";
 import APIResponseStatus from "../common/APIResponseStatus";
 import { Link } from "react-router-dom";
 
 function CreateNewProjectModal(props: any) {
-  const { setCreateNewProjectModal} = props;
+  const { setCreateNewProjectModal, defaultWorkspaceId } = props;
   const [error, setError] = useState<string | null>(null);
   const [createProjectStatus,setCreateProjectStatus] = useState<any>("not-created")
   const [createdProjectId,setCreatedProjectId] = useState<any>(null)
@@ -23,6 +24,12 @@ function CreateNewProjectModal(props: any) {
     // Clear the timeout if the component unmounts or if there's a new error
     return () => clearTimeout(timer);
   }, [error]);
+
+  // Projects live in a workspace. Default to the one being viewed on the dashboard, else the first.
+  const { data: workspaces = [], isPending: workspacesLoading } = useWorkspaces();
+  const [pickedWorkspace, setPickedWorkspace] = useState("");
+  const workspaceId = pickedWorkspace || defaultWorkspaceId || workspaces[0]?._id || "";
+  const noWorkspace = !workspacesLoading && workspaces.length === 0;
 
   const emptyState = {
     projectName: "",
@@ -42,7 +49,10 @@ function CreateNewProjectModal(props: any) {
   };
 
   const validateBeforeSubmit = () => {
-    // Check if username and password are not empty
+    if (!workspaceId) {
+      setError('Choose a workspace for this project');
+      return false;
+    }
     if (!createProjectFormData.projectName.trim()) {
       setError('Project Name cannot be empty');
       return false;
@@ -65,7 +75,7 @@ function CreateNewProjectModal(props: any) {
     if (validateBeforeSubmit()) {
       setCreateProjectStatus("create-loading")
       // Perform registration logic here call API
-      const res: any = await createNewProject(createProjectFormData,myProfiledata._id)
+      const res: any = await createNewProject({ ...createProjectFormData, workspaceId },myProfiledata._id)
       if (res?.project?._id) {
         setCreateProjectFormData(emptyState)
         setCreateProjectStatus("create-success")
@@ -93,6 +103,27 @@ function CreateNewProjectModal(props: any) {
           {
             createProjectStatus==="not-created"?
           <div className="flex flex-col flex-1 gap-2">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="projectWorkspace" className=" text-C11 text-[10px] font-bold  w-fit  select-none">
+                Workspace
+              </label>
+              {workspacesLoading ? (
+                <div className="bg-C44 rounded-[8px] p-2 text-[13px] text-gray-500">Loading workspaces...</div>
+              ) : noWorkspace ? (
+                <div className="bg-C44 rounded-[8px] p-2 text-[13px]">Create a workspace first (Workspaces in the side bar), then start your project in it.</div>
+              ) : (
+                <select
+                  id="projectWorkspace"
+                  className="bg-C44 rounded-[8px] p-2 text-[14px]"
+                  value={workspaceId}
+                  onChange={(e) => setPickedWorkspace(e.target.value)}
+                >
+                  {workspaces.map((w: any) => (
+                    <option key={w._id} value={w._id}>{w.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
             <div className="flex flex-col gap-1">
               <div className=" text-C11 text-[10px] font-bold  w-fit  select-none">
                 Project Name
@@ -147,6 +178,7 @@ function CreateNewProjectModal(props: any) {
           </button>
           <button
             onClick={handleSubmit}
+            disabled={noWorkspace || workspacesLoading}
             className={`bg-[#012b39f2] hover:bg-[#012B39] rounded-[8px] text-white font-bold text-[12px] py-2 px-5`}
           >
             Save

@@ -4,6 +4,7 @@ import {
   CheckBox,
   ViewKanban,
   History,
+  Groups,
   Delete,
   DonutLarge,
   Edit,
@@ -81,6 +82,18 @@ function ProjectPageProjectInfo(props: any) {
                 <div className="p-2 font-semibold">{activeProject?.projectStatus}</div>
               </div>
             </div>
+
+            {activeProject?.workspace?.name && (
+              <div className="flex flex-col">
+                <div className=" text-C11 text-[8px] font-bold  w-fit py-1">
+                  Workspace
+                </div>
+                <div className="flex flex-row items-center px-2 rounded-[4px] text-[12px] bg-C44 ">
+                  <Groups sx={{ fontSize: 12, color: colors.C11 }} />
+                  <div className="p-2 font-semibold">{activeProject.workspace.name}</div>
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col">
               <div className=" text-C11 text-[8px] font-bold  w-fit py-1 select-none">

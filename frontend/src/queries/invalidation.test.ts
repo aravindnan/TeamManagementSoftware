@@ -193,3 +193,63 @@ describe("task drawer writes", () => {
     expect(() => run("post", "/add-subtask-to-task/unknown", { subtasks: [] })).not.toThrow();
   });
 });
+
+describe("workspace and invitation writes", () => {
+  const W = "w1";
+  beforeEach(() => {
+    client.setQueryData(qk.workspaces, []);
+    client.setQueryData(qk.workspace(W), { _id: W });
+    client.setQueryData(qk.workspaceInvites(W), []);
+    client.setQueryData(qk.myInvites, []);
+    client.setQueryData(qk.users, []);
+  });
+
+  test.each([
+    ["post", "/workspaces"],
+    ["patch", `/workspaces/${W}`],
+    ["post", `/workspaces/${W}/transfer`],
+    ["post", `/workspaces/${W}/invites`],
+    ["post", `/workspaces/${W}/invites/i1/regenerate`],
+    ["delete", `/workspaces/${W}/invites/i1`],
+  ])("%s %s refreshes the workspace list, its detail and its invitations (one prefix), nothing unrelated", (method, url) => {
+    run(method, url);
+    for (const key of [qk.workspaces, qk.workspace(W), qk.workspaceInvites(W)]) expect(stale(key)).toBe(true);
+    expect(stale(qk.project(P))).toBe(false);
+    expect(stale(qk.me)).toBe(false);
+  });
+
+  test("deleting a workspace drops its cached detail", () => {
+    run("delete", `/workspaces/${W}`);
+    expect(exists(qk.workspace(W))).toBe(false);
+    expect(stale(qk.workspaces)).toBe(true);
+  });
+
+  test.each([["patch"], ["delete"]])("a %s on a member also refreshes projects, tasks, the directory and the user's lists", (method) => {
+    run(method, `/workspaces/${W}/members/u9`);
+    for (const key of [qk.workspace(W), qk.project(P), qk.task(T), qk.users, qk.me]) expect(stale(key)).toBe(true);
+  });
+
+  test.each([["/invites/accept"], ["/invites/i1/accept"]])("accepting an invitation (%s) refreshes workspaces, invitations and the directory", (url) => {
+    run("post", url);
+    for (const key of [qk.workspaces, qk.myInvites, qk.users]) expect(stale(key)).toBe(true);
+  });
+
+  test("declining only refreshes the invitation list", () => {
+    run("post", "/invites/i1/decline");
+    expect(stale(qk.myInvites)).toBe(true);
+    expect(stale(qk.workspaces)).toBe(false);
+  });
+
+  test("creating or deleting a project refreshes workspace project counts", () => {
+    run("post", "/create-new-project-for-user-id/u1");
+    expect(stale(qk.workspaces)).toBe(true);
+    client.setQueryData(qk.workspaces, []);
+    run("delete", `/delete-project-by-id/${P}`);
+    expect(stale(qk.workspaces)).toBe(true);
+  });
+
+  test("signing in with Google clears the whole cache, like any other sign-in", () => {
+    run("post", "/auth/google");
+    expect(client.getQueryCache().getAll()).toHaveLength(0);
+  });
+});

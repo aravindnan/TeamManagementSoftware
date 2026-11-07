@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from "react";
 import Logo from "../common/Logo";
 import { colors } from "../Constants";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {Visibility, VisibilityOff } from "@mui/icons-material";
 import ErrorBox from "../common/ErrorBox";
-import { loginUser } from "../services/authServices";
+import { googleLogin, loginUser } from "../services/authServices";
+import GoogleSignInButton from "../components/GoogleSignInButton";
+import { GOOGLE_CLIENT_ID } from "../env/environment";
+import { safeRedirect, withRedirect } from "../helper/redirect";
 import { useMe } from "../queries/hooks";
 import { errorMessage } from "../services/apiClient";
 import APIResponseStatus from "../common/APIResponseStatus";
@@ -17,6 +20,10 @@ function Login() {
   const [error, setError] = useState<string | null>(null);
   const [apiResponseMessage,setApiResponseMessage] = useState<string>("")
   const navigate = useNavigate();
+  // Where to go afterwards (e.g. back to an invitation). Only in-app paths are honoured.
+  const [searchParams] = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
+  const destination = safeRedirect(redirectParam);
 
 
   const retryLogin=()=>{
@@ -30,8 +37,8 @@ function Login() {
     document.title = "TMS • Log In";
   }, []);
   useEffect(() => {
-    if (me) navigate("/dashboard");
-  }, [me, navigate]);
+    if (me) navigate(destination);
+  }, [me, navigate, destination]);
 
 //   const getMyProfileData =async(myUserId:any)=>{
 //     const tempOBJ = await getUserById(myUserId)
@@ -79,6 +86,17 @@ function Login() {
     return true;
   };
 
+  const handleGoogle = async (credential: string) => {
+    setLoginStatus("login-loading")
+    const res: any = await googleLogin(credential)
+    if (res?.success) {
+      navigate(destination)
+    } else {
+      setLoginStatus("login-failure")
+      setApiResponseMessage(errorMessage(res, "Google sign-in failed"))
+    }
+  }
+
   const handleSubmit = async() => {
     // Add your validation logic here
     if (validateBeforeSubmit()) {
@@ -88,7 +106,7 @@ function Login() {
       if (res?.success) {
         setLoginStatus("login-success")
         setApiResponseMessage(res.message)
-        navigate("/dashboard")
+        navigate(destination)
       } else {
         setLoginStatus("login-failure")
         setApiResponseMessage(errorMessage(res, "Login failed"))
@@ -165,11 +183,22 @@ function Login() {
               Log In
             </button>
           </div>
+          {GOOGLE_CLIENT_ID && (
+            <div className="flex flex-col items-center gap-3 mt-5 px-3">
+              <div className="flex flex-row items-center gap-3 w-full text-[11px] text-gray-500">
+                <span className="flex-1 h-[1px] bg-C44" />
+                <span>or</span>
+                <span className="flex-1 h-[1px] bg-C44" />
+              </div>
+              <GoogleSignInButton text="signin_with" onCredential={handleGoogle} />
+            </div>
+          )}
+
           <div className="flex flex-col justify-center gap-3 mt-4"             
                 data-aos="fade-up"
                 data-aos-duration="2200">
           <div className="mx-auto" >
-          <Link to={"/register"} >
+          <Link to={withRedirect("/register", redirectParam)} >
             <div
               className={`text-[11px] text-[#1F7A8C]  cursor-pointer  text-center  w-fit hover:underline underline-offset-1 hover:text-C11`}
             >

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import ModalOverlay from '../common/ModalOverlay';
 import { Close } from "@mui/icons-material";
 import ErrorBox from "../common/ErrorBox";
-import { useUserDirectory } from "../queries/hooks";
+import { useUserDirectory, useWorkspace } from "../queries/hooks";
 import APIResponseStatus from "../common/APIResponseStatus";
 import { addMemberToProject } from "../services/projectServices";
 import { useSelector } from "react-redux";
@@ -25,19 +25,27 @@ function AddNewMemberModal(props: any) {
     return () => clearTimeout(timer);
   }, [error]);
 
-  // People who can still be added: everyone except those already on the project.
-  const directory = useUserDirectory()
+  // People who can still be added. A project in a workspace can only include that workspace's people;
+  // older projects without one fall back to everyone you share a workspace or project with.
+  const workspaceId: string | undefined = activeProject?.workspace?._id
+  const workspace = useWorkspace(workspaceId)
+  const directory = useUserDirectory(!workspaceId)
+  const source = workspaceId ? workspace : directory
+  const candidates: any[] = useMemo(
+    () => (workspaceId ? (workspace.data?.members ?? []).map((m: any) => m.user) : directory.data ?? []),
+    [workspaceId, workspace.data, directory.data]
+  )
   const memberIds = (activeProject?.projectMembers || []).map((m: any) => m._id)
   const memberKey = memberIds.join(",")
   const allUsers: any[] = useMemo(
-    () => (directory.data || []).filter((user: any) => user._id !== myProfiledata?._id && !memberKey.split(",").includes(user._id)),
-    [directory.data, myProfiledata?._id, memberKey]
+    () => candidates.filter((user: any) => user._id !== myProfiledata?._id && !memberKey.split(",").includes(user._id)),
+    [candidates, myProfiledata?._id, memberKey]
   )
-  const loading = directory.isPending
+  const loading = source.isPending
 
   useEffect(() => {
-    if (directory.isError) setError("Could not load users. Please try again.")
-  }, [directory.isError])
+    if (source.isError) setError("Could not load users. Please try again.")
+  }, [source.isError])
 
   const emptyState = {
     memberId: "",
@@ -107,6 +115,11 @@ function AddNewMemberModal(props: any) {
             <div className=" text-C11 text-[10px] font-bold  w-fit  select-none">
               Choose a member
             </div>
+            {workspaceId && (
+              <div className="text-[11px] text-gray-500">
+                {`Only people in the ${activeProject?.workspace?.name} workspace can be added. Invite others to it from the Workspaces panel.`}
+              </div>
+            )}
             <select
               name="memberId"
               id="memberId"

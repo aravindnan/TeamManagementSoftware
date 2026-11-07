@@ -24,3 +24,10 @@ describe("isApiError", () => {
     expect(isApiError({ _id: "1" })).toBe(false);
   });
 });
+
+import { isPublicPath } from "./apiClient";
+
+describe("isPublicPath", () => {
+  test.each(["/", "/login", "/register", "/invite/abc123"])("%s works signed out", (path) => expect(isPublicPath(path)).toBe(true));
+  test.each(["/dashboard", "/project-page", "/task-page", "/invitefoo", "/invites"])("%s requires a session", (path) => expect(isPublicPath(path)).toBe(false));
+});

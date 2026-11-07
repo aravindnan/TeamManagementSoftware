@@ -498,3 +498,63 @@ describe("invitations in the app (verified addresses only)", () => {
     await snoop.a.post("/invites/nope/accept").expect(400);
   });
 });
+
+describe("migrating projects created before workspaces existed", () => {
+  const { migrateLegacyProjects } = require("../utils/migrateWorkspaces");
+
+  async function legacy() {
+    const boss = await signup(1), a = await signup(2), b = await signup(3);
+    const mk = async (owner, name, members = []) => {
+      const id = (await owner.a.post(`/create-new-project-for-user-id/${owner.id}`).send({ projectName: name })).body.project._id; // no workspace
+      for (const m of members) await owner.a.post(`/add-new-member-by-project-id/${id}`).send({ memberId: m.id }).expect(200);
+      return id;
+    };
+    return { boss, a, b, mk };
+  }
+
+  test("creates one workspace per manager, adds everyone on their projects, and links the projects", async () => {
+    const { boss, a, b, mk } = await legacy();
+    const p1 = await mk(boss, "One", [a]);
+    const p2 = await mk(boss, "Two", [a, b]);
+    const p3 = await mk(a, "Theirs", []);
+    const summary = await migrateLegacyProjects();
+    expect(summary).toEqual({ workspacesCreated: 2, projectsMigrated: 3, membersAdded: 2 });
+
+    const bossWs = await Workspace.findOne({ owner: boss.id });
+    expect(bossWs.name).toBe("First1's workspace");
+    expect(bossWs.members.map((m) => [String(m.user), m.role]).sort()).toEqual([[boss.id, "owner"], [a.id, "member"], [b.id, "member"]].sort());
+    for (const id of [p1, p2]) expect(String((await Project.findById(id)).workspace)).toBe(String(bossWs._id));
+    const aWs = await Workspace.findOne({ owner: a.id });
+    expect(String((await Project.findById(p3)).workspace)).toBe(String(aWs._id));
+
+    // the people can now use the workspace features
+    expect((await b.a.get(`/workspaces/${bossWs._id}`).expect(200)).body.myRole).toBe("member");
+  });
+
+  test("is safe to run again: nothing is duplicated and migrated projects are left alone", async () => {
+    const { boss, a, mk } = await legacy();
+    await mk(boss, "One", [a]);
+    await migrateLegacyProjects();
+    const again = await migrateLegacyProjects();
+    expect(again).toEqual({ workspacesCreated: 0, projectsMigrated: 0, membersAdded: 0 });
+    expect(await Workspace.countDocuments()).toBe(1);
+  });
+
+  test("a later legacy project joins the existing migrated workspace, and projects already in a workspace are untouched", async () => {
+    const { boss, a, mk } = await legacy();
+    await mk(boss, "Old", [a]);
+    await migrateLegacyProjects();
+    const wsId = (await Workspace.findOne({ owner: boss.id }))._id;
+    const another = await makeWorkspace(boss, "Hand made");
+    const inOther = (await boss.a.post(`/create-new-project-for-user-id/${boss.id}`).send({ projectName: "Kept", workspaceId: another })).body.project._id;
+    const late = await mk(boss, "Late", []);
+    const summary = await migrateLegacyProjects();
+    expect(summary).toEqual({ workspacesCreated: 0, projectsMigrated: 1, membersAdded: 0 });
+    expect(String((await Project.findById(late)).workspace)).toBe(String(wsId));
+    expect(String((await Project.findById(inOther)).workspace)).toBe(String(another)); // not moved
+  });
+
+  test("with nothing to migrate it does nothing", async () => {
+    expect(await migrateLegacyProjects()).toEqual({ workspacesCreated: 0, projectsMigrated: 0, membersAdded: 0 });
+  });
+});

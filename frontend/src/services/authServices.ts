@@ -15,3 +15,6 @@ export const getMe = async (): Promise<any> => {
   if (res?.response?.status === 401) return null;
   return res;
 };
+
+/** Signs in (or up) with a Google ID token obtained from Google Identity Services. */
+export const googleLogin = (credential: string) => call(api.post("/auth/google", { credential }));

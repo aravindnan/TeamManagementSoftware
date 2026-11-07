@@ -8,6 +8,7 @@ import HomePage from "./pages/HomePage";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ErrorPage from "./pages/ErrorPage";
+import InvitePage from "./pages/InvitePage";
 
 // The authenticated app is split into its own chunks so the landing/login pages load fast.
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -31,6 +32,7 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/invite/:token" element={<InvitePage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/project-page" element={<ProjectPage />} />
             <Route path="/task-page" element={<TaskPage />} />

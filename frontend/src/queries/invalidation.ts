@@ -84,6 +84,7 @@ export const RULES: Rule[] = [
       client.removeQueries({ queryKey: qk.project(id) }); // gone: never show it from cache again
       invalidate(client, qk.tasks);
       invalidate(client, qk.me);
+      invalidate(client, qk.workspaces); // project counts
     },
   },
 
@@ -134,7 +135,14 @@ export const RULES: Rule[] = [
   },
 
   // the user's own record
-  { method: "post", pattern: /^\/create-new-project-for-user-id\/(\w+)$/, apply: ({ client }) => invalidate(client, qk.me) },
+  {
+    method: "post",
+    pattern: /^\/create-new-project-for-user-id\/(\w+)$/,
+    apply: ({ client }) => {
+      invalidate(client, qk.me);
+      invalidate(client, qk.workspaces); // project counts
+    },
+  },
   {
     method: "put",
     pattern: /^\/update-user-profile\/(\w+)$/,
@@ -150,8 +158,47 @@ export const RULES: Rule[] = [
   { method: "post", pattern: /^\/notifications\/(\w+)\/read$/, apply: ({ client }) => invalidate(client, qk.unreadCount) },
   { method: "post", pattern: /^\/notifications\/read-all$/, apply: ({ client }) => invalidate(client, qk.notifications) },
 
+  // ---- workspaces: the list, every detail view and the invitation lists all live under one prefix
+  { method: "post", pattern: /^\/workspaces$/, apply: ({ client }) => invalidate(client, qk.workspaces) },
+  { method: "patch", pattern: /^\/workspaces\/(\w+)$/, apply: ({ client }) => invalidate(client, qk.workspaces) },
+  { method: "delete", pattern: /^\/workspaces\/(\w+)$/, apply: ({ client, id }) => {
+      client.removeQueries({ queryKey: qk.workspace(id) });
+      invalidate(client, qk.workspaces);
+    } },
+  // membership changes also move people on and off projects, tasks and the user directory
+  ...(["patch", "delete"] as const).map(
+    (method): Rule => ({
+      method,
+      pattern: /^\/workspaces\/(\w+)\/members\/\w+$/,
+      apply: ({ client }) => {
+        invalidate(client, qk.workspaces);
+        invalidate(client, qk.projects);
+        invalidate(client, qk.tasks);
+        invalidate(client, qk.users);
+        invalidate(client, qk.me);
+      },
+    })
+  ),
+  { method: "post", pattern: /^\/workspaces\/(\w+)\/transfer$/, apply: ({ client }) => invalidate(client, qk.workspaces) },
+  { method: "post", pattern: /^\/workspaces\/(\w+)\/invites$/, apply: ({ client }) => invalidate(client, qk.workspaces) },
+  { method: "post", pattern: /^\/workspaces\/(\w+)\/invites\/\w+\/regenerate$/, apply: ({ client }) => invalidate(client, qk.workspaces) },
+  { method: "delete", pattern: /^\/workspaces\/(\w+)\/invites\/\w+$/, apply: ({ client }) => invalidate(client, qk.workspaces) },
+
+  // joining a workspace changes who you can see and add to projects
+  {
+    method: "post",
+    pattern: /^\/invites\/(?:accept|\w+\/accept)$/,
+    apply: ({ client }) => {
+      invalidate(client, qk.workspaces);
+      invalidate(client, qk.myInvites);
+      invalidate(client, qk.users);
+      invalidate(client, qk.notifications);
+    },
+  },
+  { method: "post", pattern: /^\/invites\/(\w+)\/decline$/, apply: ({ client }) => invalidate(client, qk.myInvites) },
+
   // a different person may be about to use this browser: never let one user's cache reach another
-  { method: "post", pattern: /^\/(login|logout|register)$/, apply: ({ client }) => client.clear() },
+  { method: "post", pattern: /^\/(login|logout|register|auth\/google)$/, apply: ({ client }) => client.clear() },
 ];
 
 /** Called by the HTTP layer after every successful request. Reads (GET) never match. */

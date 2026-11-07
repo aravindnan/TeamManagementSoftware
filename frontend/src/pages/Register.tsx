@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from "react";
 import Logo from "../common/Logo";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { colors } from "../Constants";
 import { ArrowForwardRounded, ReplayRounded, RestartAltRounded, Visibility, VisibilityOff } from "@mui/icons-material";
 import ErrorBox from "../common/ErrorBox";
-import { registerUser } from "../services/authServices";
+import { googleLogin, registerUser } from "../services/authServices";
+import GoogleSignInButton from "../components/GoogleSignInButton";
+import { GOOGLE_CLIENT_ID } from "../env/environment";
+import { safeRedirect, withRedirect } from "../helper/redirect";
 import { useMe } from "../queries/hooks";
 import { errorMessage } from "../services/apiClient";
 import APIResponseStatus from "../common/APIResponseStatus";
@@ -19,14 +22,19 @@ function Register() {
   const [apiResponseMessage,setApiResponseMessage] = useState<string>("")
 
   const navigate = useNavigate()
+  // Carried over from an invitation: where to go afterwards, and the address the invitation was sent to.
+  const [searchParams] = useSearchParams()
+  const redirectParam = searchParams.get("redirect")
+  const destination = safeRedirect(redirectParam)
+  const invitedEmail = searchParams.get("email") || ""
 
   const { data: me } = useMe();
   useEffect(() => {
     document.title = "TMS • Sign Up";
   }, []);
   useEffect(() => {
-    if (me) navigate("/dashboard");
-  }, [me, navigate]);
+    if (me) navigate(destination);
+  }, [me, navigate, destination]);
 
   const retryRegister = () => {
     setRegisterStatus("not-registered");
@@ -58,7 +66,7 @@ function Register() {
     username: "",
     role: "",
     dateOfBirth: "",
-    email: "",
+    email: invitedEmail,
     password: "",
     cpassword: "",
   };
@@ -69,7 +77,7 @@ function Register() {
     username: "",
     role: "",
     dateOfBirth: "",
-    email: "",
+    email: invitedEmail,
     password: "",
     cpassword: "",
   });
@@ -124,6 +132,17 @@ function Register() {
     return true;
   };
 
+  const handleGoogle = async (credential: string) => {
+    setRegisterStatus("register-loading");
+    const res: any = await googleLogin(credential);
+    if (res?.success) {
+      navigate(destination);
+    } else {
+      setApiResponseMessage(errorMessage(res, "Google sign-up failed"));
+      setRegisterStatus("register-failure");
+    }
+  };
+
   const handleSubmit = async () => {
     // Add your validation logic here
     if (validateBeforeSubmit()) {
@@ -134,7 +153,7 @@ function Register() {
       if (res?.registerSuccess) {
         setRegisterStatus("register-success");
         setRegisterFormData(emptyState);
-        navigate("/login");
+        navigate(withRedirect("/login", redirectParam));
       } else {
         setApiResponseMessage(errorMessage(res, "Registration failed"));
         setRegisterStatus("register-failure");
@@ -288,10 +307,21 @@ function Register() {
                 Sign Up
               </button>
             </div>
+
+            {GOOGLE_CLIENT_ID && (
+              <div className="flex flex-col items-center gap-3 mt-4 px-3">
+                <div className="flex flex-row items-center gap-3 w-full text-[11px] text-gray-500">
+                  <span className="flex-1 h-[1px] bg-C44" />
+                  <span>or</span>
+                  <span className="flex-1 h-[1px] bg-C44" />
+                </div>
+                <GoogleSignInButton text="signup_with" onCredential={handleGoogle} />
+              </div>
+            )}
             <div className="flex flex-col justify-center gap-2 pb-5 mt-2 md:pb-0" data-aos="fade-up" data-aos-duration="2800">
           <div className="mx-auto" 
  >
-          <Link to={"/login"}>
+          <Link to={withRedirect("/login", redirectParam)}>
               <div
                 className={`text-[11px] text-C22 hover:text-C11 cursor-pointer  text-center py-2 hover:underline underline-offset-1`}
               >
@@ -332,7 +362,7 @@ function Register() {
                 </span>
               </button>
               <button
-                onClick={() => navigate("/login")}
+                onClick={() => navigate(withRedirect("/login", redirectParam))}
                 className={`hover:bg-[#012b3927] rounded-[8px] text-C11 font-bold text-[12px] py-2 px-5 flex flex-row items-center gap-1`}
               >
                 <span>Go To Login</span>

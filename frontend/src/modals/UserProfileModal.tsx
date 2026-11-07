@@ -40,7 +40,6 @@ function UserProfileModal(props:any) {
         !userProfileFormData.lastName ||
         !userProfileFormData.username ||
         !userProfileFormData.role ||
-        !userProfileFormData.dateOfBirth ||
         !userProfileFormData.email
       ) {
         setError("All fields are required");
@@ -54,14 +53,13 @@ function UserProfileModal(props:any) {
         return false;
       }
 
-      const currentDate = new Date();
-      const birthDate = new Date(userProfileFormData.dateOfBirth);
-      const ageDifference = currentDate.getFullYear() - birthDate.getFullYear();
-  
-      // Check if the person is above 18
-      if (ageDifference < 18) {
-        setError("Age must be 18 or above");
-        return false;
+      // Date of birth is optional (accounts created with Google do not have one), but if given it must be 18+
+      if (userProfileFormData.dateOfBirth) {
+        const ageDifference = new Date().getFullYear() - new Date(userProfileFormData.dateOfBirth).getFullYear();
+        if (ageDifference < 18) {
+          setError("Age must be 18 or above");
+          return false;
+        }
       }
       // Add more validation logic based on your requirements
   
@@ -173,7 +171,7 @@ function UserProfileModal(props:any) {
         </div>
         <div className='flex flex-row items-center justify-between p-1 px-5 my-1 gap-x-2 bg-C44 rounded-[4px]'>
           <div className='w-1/2 text-C11'>Date of birth</div>
-          <div className='w-1/2 font-bold'>{moment(myProfiledata.dateOfBirth).format("LL")}</div>
+          <div className='w-1/2 font-bold'>{myProfiledata.dateOfBirth ? moment(myProfiledata.dateOfBirth).format("LL") : "Not set"}</div>
         </div>
         <div className='flex flex-row items-start justify-between p-1 px-5 my-1 gap-x-2 bg-C44 rounded-[4px]'>
           <div className='w-1/2 text-C11'>Bio</div>

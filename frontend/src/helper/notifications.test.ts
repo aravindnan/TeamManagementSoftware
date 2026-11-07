@@ -41,3 +41,15 @@ test("badgeText caps large counts", () => {
   expect(badgeText(99)).toBe("99");
   expect(badgeText(100)).toBe("99+");
 });
+
+describe("workspace notifications", () => {
+  test("an invitation says who invited you to what, as which role, and points at the dashboard where it can be accepted", () => {
+    const r = describeNotification(n("workspace.invited", { workspaceName: "Acme Co", role: "admin" }));
+    expect(r).toEqual({ lead: "invited you to join", subject: "Acme Co", trail: "as an admin", to: "/dashboard" });
+    expect(describeNotification(n("workspace.invited", { workspaceName: "Acme Co", role: "member" })).trail).toBe("as a member");
+  });
+  test("someone joining has no destination", () => {
+    const r = describeNotification(n("workspace.joined", { workspaceName: "Acme Co", role: "member" }));
+    expect(r).toEqual({ lead: "joined", subject: "Acme Co", trail: "as a member" });
+  });
+});

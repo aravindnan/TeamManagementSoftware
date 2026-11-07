@@ -8,6 +8,7 @@ import type { ActivityCategory } from "../services/projectServices";
 import { getTaskById } from "../services/taskServices";
 import { getNotifications, getUnreadCount } from "../services/notificationServices";
 import { getAllUsers } from "../services/userServices";
+import { getMyInvites, getWorkspace, getWorkspaceInvites, getWorkspaces, previewInvite } from "../services/workspaceServices";
 import { loginAction, logoutAction } from "../redux/actions/authActions";
 import { qk } from "./keys";
 import { NotSignedInError, unwrap } from "./unwrap";
@@ -139,5 +140,40 @@ export function useUserDirectory(enabled = true) {
     queryKey: qk.users,
     queryFn: async () => unwrap<any[]>(await getAllUsers()),
     enabled,
+  });
+}
+
+export function useWorkspaces(enabled = true) {
+  return useQuery({ queryKey: qk.workspaces, queryFn: async () => unwrap<any[]>(await getWorkspaces()), enabled });
+}
+
+export function useWorkspace(workspaceId: string | null | undefined) {
+  return useQuery({
+    queryKey: qk.workspace(workspaceId ?? ""),
+    queryFn: async () => unwrap<any>(await getWorkspace(workspaceId as string)),
+    enabled: !!workspaceId,
+  });
+}
+
+/** Pending invitations of one workspace (admins only; `enabled` keeps it from being requested for everyone else). */
+export function useWorkspaceInvites(workspaceId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: qk.workspaceInvites(workspaceId),
+    queryFn: async () => unwrap<any[]>(await getWorkspaceInvites(workspaceId)),
+    enabled,
+  });
+}
+
+/** Invitations addressed to the signed-in person's verified email. */
+export function useMyInvites(enabled = true) {
+  return useQuery({ queryKey: qk.myInvites, queryFn: async () => unwrap<any[]>(await getMyInvites()), enabled });
+}
+
+/** Public: what an invitation link is for. Not cached long: its status changes. */
+export function useInvitePreview(token: string) {
+  return useQuery({
+    queryKey: qk.invitePreview(token),
+    queryFn: async () => unwrap<any>(await previewInvite(token)),
+    staleTime: 0,
   });
 }

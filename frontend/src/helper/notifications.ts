@@ -45,6 +45,10 @@ export function describeNotification(n: NotificationItem): NotificationText {
       return { lead: "commented on", subject: d.title, to: taskLink(n), detail: quote(d.excerpt) };
     case "task.reassigned":
       return { lead: "reassigned", subject: d.title, trail: `from ${d.from} to ${d.to}`, to: taskLink(n) };
+    case "workspace.invited":
+      return { lead: "invited you to join", subject: d.workspaceName, trail: `as ${d.role === "admin" ? "an admin" : "a member"}`, to: "/dashboard" };
+    case "workspace.joined":
+      return { lead: "joined", subject: d.workspaceName, trail: `as ${d.role === "admin" ? "an admin" : "a member"}` };
     case "task.deleted":
       return { lead: "deleted task", subject: d.title };
     case "member.added":
