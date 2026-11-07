@@ -19,8 +19,8 @@ describe("filterAndSortTasks", () => {
     expect(ids(filterAndSortTasks(tasks, { ...base, search: "c3" }))).toEqual(["c3"]);
   });
   test("combines status and priority filters", () => {
-    expect(ids(filterAndSortTasks(tasks, { ...base, status: "in-progress", priority: "High" }))).toEqual(["c3"]);
-    expect(ids(filterAndSortTasks(tasks, { ...base, status: "completed" }))).toEqual(["b2"]);
+    expect(ids(filterAndSortTasks(tasks, { ...base, status: "In Progress", priority: "High" }))).toEqual(["c3"]);
+    expect(ids(filterAndSortTasks(tasks, { ...base, status: "Completed" }))).toEqual(["b2"]);
   });
   test("sorts by due date with undated tasks last", () => {
     expect(ids(filterAndSortTasks(tasks, { ...base, sort: "due" }))).toEqual(["d4", "b2", "a1", "c3"]);

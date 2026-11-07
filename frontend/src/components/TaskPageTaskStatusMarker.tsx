@@ -164,11 +164,11 @@ function TaskPageTaskStatusMarker(props: any) {
               className="text-C11 border-2 border-C11 transition duration-300  hover:text-C55  justify-between text-[14px] font-bold hover:bg-C11  rounded-[4px] py-2 px-4 w-full flex flex-row gap-1 items-center "
             >
               <span>{`${
-                activeTask?.taskStatus === "In Progress"
+                activeTask?.taskStatus !== "Completed"
                   ? "Mark as Complete"
                   : "Mark as In Progress"
               }`}</span>
-              {activeTask?.taskStatus === "In Progress" ? <Done /> : <Replay />}
+              {activeTask?.taskStatus !== "Completed" ? <Done /> : <Replay />}
             </button>
           </div>
         ) : null}

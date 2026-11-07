@@ -44,7 +44,7 @@ function ViewAllTaskModal(props: any) {
 
         <div className="flex flex-row flex-wrap items-center gap-x-5 gap-y-1 w-full justify-end rounded-[6px] text-[12px] p-1 mt-1">
           <div className="flex flex-row items-center gap-1" role="group" aria-label="Filter by status">
-            {([["all", "All"], ["completed", "Completed"], ["in-progress", "In Progress"]] as [StatusFilter, string][]).map(([key, label]) => (
+            {([["all", "All"], ["To Do", "To Do"], ["In Progress", "In Progress"], ["In Review", "In Review"], ["Completed", "Completed"]] as [StatusFilter, string][]).map(([key, label]) => (
               <button key={key} onClick={() => setStatus(key)} aria-pressed={status === key} className={chip(status === key)}>
                 {label}
               </button>

@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { TASK_STATUSES } = require("../utils/constants");
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid id");
 const trimmed = (min, max, label) =>
@@ -72,10 +73,10 @@ const editTask = z.object({
   taskTitle: trimmed(1, 200, "Task title"),
   taskDescription: z.string().trim().max(5000).optional().default(""),
   taskPriority: z.enum(["High", "Medium", "Low"]),
-  taskStatus: z.enum(["In Progress", "Completed"]),
+  taskStatus: z.enum(TASK_STATUSES),
   dueDate: z.string().trim().max(60).optional(),
 });
-const changeStatus = z.object({ newStatus: z.enum(["In Progress", "Completed"]) });
+const changeStatus = z.object({ newStatus: z.enum(TASK_STATUSES) });
 
 // ---- shared
 const comment = z.object({ messageContent: trimmed(1, 2000, "Comment") });

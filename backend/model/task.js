@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { mediaSchema } = require("./media");
+const { TASK_STATUSES } = require("../utils/constants");
 
 const taskSchema = new mongoose.Schema(
   {
@@ -9,7 +10,8 @@ const taskSchema = new mongoose.Schema(
     project: { type: mongoose.Schema.Types.ObjectId, ref: "Project", required: true, index: true },
     assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    taskStatus: { type: String, enum: ["In Progress", "Completed"], default: "In Progress" },
+    // Existing tasks are "In Progress"/"Completed"; new tasks start in the board's first column.
+    taskStatus: { type: String, enum: TASK_STATUSES, default: "To Do" },
     // Kept as strings for compatibility with the existing UI date handling.
     dueDate: { type: String },
     assignedOn: { type: String },

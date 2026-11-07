@@ -61,7 +61,7 @@ import APIResponseStatus from "../common/APIResponseStatus";
     if (myProfiledata?.allTasks) {
       const tasks = myProfiledata.allTasks;
 
-      const pending = tasks.filter((task: any) => task.taskStatus === 'In Progress');
+      const pending = tasks.filter((task: any) => task.taskStatus !== 'Completed');
       const completed = tasks.filter((task: any) => task.taskStatus === 'Completed');
 
       setPendingTasks(pending);

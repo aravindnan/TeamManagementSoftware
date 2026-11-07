@@ -154,8 +154,14 @@ function EditTaskModal(props: any) {
                 <option value="" selected>
                   None Selected
                 </option>
+                <option value="To Do" >
+                  To Do
+                </option>
                 <option value="In Progress" >
                   In Progress
+                </option>
+                <option value="In Review" >
+                  In Review
                 </option>
                 <option value="Completed" >
                   Completed

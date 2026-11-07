@@ -53,7 +53,7 @@ function ChangeStatusModal(props:any) {
       </div> 
       {updateTaskStatus==="not-updated"?
       <div className="mt-4 mb-6 text-[14px]">
-        {activeTask?.taskStatus==="In Progress"?
+        {activeTask?.taskStatus!=="Completed"?
         <span>Do you confirm to mark this  task as <strong>Completed</strong>?</span>:
         <span>Do you confirm change task as <strong>In Progress</strong>?</span>
         }

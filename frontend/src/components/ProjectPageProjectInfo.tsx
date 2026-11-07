@@ -2,6 +2,7 @@ import {
   Add,
   CalendarMonth,
   CheckBox,
+  ViewKanban,
   Delete,
   DonutLarge,
   Edit,
@@ -21,6 +22,7 @@ function ProjectPageProjectInfo(props: any) {
     setAddTaskModal,
     activeProject, 
     setViewAllTaskModal, 
+    setBoardModal,
     setOverallPerformanceModal ,
     setEditProjectInfoModal,
     setViewMemberModal,
@@ -77,6 +79,21 @@ function ProjectPageProjectInfo(props: any) {
                 <DonutLarge sx={{ fontSize: 12, color: colors.C11 }} />
                 <div className="p-2 font-semibold">{activeProject?.projectStatus}</div>
               </div>
+            </div>
+
+            <div className="flex flex-col">
+              <div className=" text-C11 text-[8px] font-bold  w-fit py-1 select-none">
+                Board
+              </div>
+              <Tooltip title={"Open Kanban Board"} arrow placement="bottom">
+                <button
+                  onClick={() => setBoardModal(true)}
+                  className="flex flex-row items-center px-2 rounded-[4px] text-[12px] cursor-pointer bg-C44 "
+                >
+                  <ViewKanban sx={{ fontSize: 12, color: colors.C11 }} />
+                  <div className="p-2 font-semibold">Kanban</div>
+                </button>
+              </Tooltip>
             </div>
 
             {/* Project Manager Privileges */}

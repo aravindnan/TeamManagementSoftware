@@ -141,6 +141,22 @@ describe("projects & tasks", () => {
     expect(mine.body.allTasks).toHaveLength(1);
   });
 
+  test("tasks start in To Do and can move through every board column", async () => {
+    const { m, t, outsider, projectId } = await setup();
+    const c = await m.a.post(`/add-new-task-by-project-id/${projectId}`).send(taskBody(t.id));
+    const id = c.body.taskId;
+    expect((await t.a.get(`/get-task-by-id/${id}`)).body.taskStatus).toBe("To Do");
+    for (const status of ["In Progress", "In Review", "Completed", "To Do"]) {
+      await t.a.put(`/change-task-status-by-id/${id}`).send({ newStatus: status }).expect(200);
+      expect((await t.a.get(`/get-task-by-id/${id}`)).body.taskStatus).toBe(status);
+    }
+    await outsider.a.put(`/change-task-status-by-id/${id}`).send({ newStatus: "Completed" }).expect(403);
+    // a plain member who is neither assignee, creator nor manager cannot move it
+    const bystander = await signup(5);
+    await m.a.post(`/add-new-member-by-project-id/${projectId}`).send({ memberId: bystander.id });
+    await bystander.a.put(`/change-task-status-by-id/${id}`).send({ newStatus: "Completed" }).expect(403);
+  });
+
   test("performance endpoint works", async () => {
     const { m, t, projectId } = await setup();
     const c = await m.a.post(`/add-new-task-by-project-id/${projectId}`).send(taskBody(t.id));

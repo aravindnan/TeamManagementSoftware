@@ -5,6 +5,7 @@ import ProjectPageProjectMembers from "../components/ProjectPageProjectMembers";
 import ProjectPageAttachedMedia from "../components/ProjectPageAttachedMedia";
 import AddNewTaskModal from "../modals/AddNewTaskModal";
 import ViewAllTaskModal from "../modals/ViewAllTaskModal";
+import BoardModal from "../modals/BoardModal";
 import Sidebar from "../components/Sidebar";
 import UserProfileModal from "../modals/UserProfileModal";
 import RemoveMemberConfirmationModal from "../modals/RemoveMemberConfirmationModal";
@@ -30,6 +31,7 @@ function ProjectPage() {
   const commentsContainerRef = useRef<HTMLDivElement>(null);
   const [addTaskModal,setAddTaskModal]=useState<Boolean>(false)
   const [viewAllTaskModal,setViewAllTaskModal] = useState<Boolean>(false)
+  const [boardModal,setBoardModal] = useState<Boolean>(false)
   const [userProfileModal,setUserProfileModal]=useState<Boolean>(false)
   const [overallPerformaceModal,setOverallPerformanceModal]=useState<Boolean>(false)
   const [removeMemberModal,setRemoveMemberModal] = useState<any>({isOpen: false, memberData: null})
@@ -99,7 +101,7 @@ function ProjectPage() {
     if (activeProject?.allTasks) {
       const tasks = activeProject.allTasks;
 
-      const pending = tasks.filter((task: any) => task.taskStatus === 'In Progress');
+      const pending = tasks.filter((task: any) => task.taskStatus !== 'Completed');
       const completed = tasks.filter((task: any) => task.taskStatus === 'Completed');
 
       setPendingTasks(pending);
@@ -149,6 +151,7 @@ const getMyProfileData = async () => {
         activeProject={activeProject} 
         setAddTaskModal={setAddTaskModal}
         setViewAllTaskModal = {setViewAllTaskModal} 
+        setBoardModal={setBoardModal}
         setOverallPerformanceModal={setOverallPerformanceModal}
         setEditProjectInfoModal={setEditProjectInfoModal}
         setViewMemberModal={setViewMemberModal}
@@ -205,6 +208,15 @@ const getMyProfileData = async () => {
      activeProject={activeProject} 
      setAddTaskModal={setAddTaskModal}
      />:null
+     }
+     {
+      boardModal?
+      <BoardModal
+      activeProject={activeProject}
+      myProfiledata={myProfiledata}
+      setBoardModal={setBoardModal}
+      triggerRerender={triggerRerender}
+      />:null
      }
      {
       // View all tasks of the project modal 

@@ -16,3 +16,7 @@ export const colors={
 
 export const acceptedFileTypes = "image/*,.pps,.txt,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.slideshow,application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
+
+// Task workflow, in board-column order. Must match backend/utils/constants.js.
+export const TASK_STATUSES = ["To Do", "In Progress", "In Review", "Completed"] as const;
+export type TaskStatus = typeof TASK_STATUSES[number];

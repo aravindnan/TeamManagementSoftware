@@ -1,4 +1,4 @@
-export type StatusFilter = "all" | "completed" | "in-progress";
+export type StatusFilter = "all" | "To Do" | "In Progress" | "In Review" | "Completed";
 export type PriorityFilter = "all" | "High" | "Medium" | "Low";
 export type SortMode = "default" | "due" | "priority";
 
@@ -17,8 +17,7 @@ export function filterAndSortTasks(tasks: any[], { search, status, priority, sor
 
   const result = tasks.filter((t) => {
     if (q && !(String(t.taskTitle || "").toLowerCase().includes(q) || String(t._id || "").toLowerCase().includes(q))) return false;
-    if (status === "completed" && t.taskStatus !== "Completed") return false;
-    if (status === "in-progress" && t.taskStatus !== "In Progress") return false;
+    if (status !== "all" && t.taskStatus !== status) return false;
     if (priority !== "all" && t.taskPriority !== priority) return false;
     return true;
   });
