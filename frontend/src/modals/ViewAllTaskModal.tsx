@@ -1,311 +1,111 @@
-import {
-  Close,
-  } from "@mui/icons-material";
-import React, { useState } from "react";
-import { Tooltip } from "@mui/material";
-import { Link } from "react-router-dom";
+import { Close } from "@mui/icons-material";
+import React, { useMemo, useState } from "react";
+import ModalOverlay from "../common/ModalOverlay";
 import NoDataMessage from "../common/NoDataMessage";
-import moment from "moment";
+import TaskRow from "../components/TaskRow";
+import { filterAndSortTasks, SortMode, StatusFilter, PriorityFilter } from "../helper/taskFilters";
+
+const chip = (active: boolean) =>
+  ` ${active ? "bg-[#012b3927] text-C11" : "text-gray-500"} rounded-[6px] font-bold text-[10px] py-1 px-2`;
 
 function ViewAllTaskModal(props: any) {
   const { setViewAllTaskModal, activeProject } = props;
 
   const [searchKey, setSearchKey] = useState<string>("");
-  const [filteredTasks, setFilteredTasks] = useState<any>([]);
-  const [filterMode, setFilterMode] = useState<string>("all");
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [priority, setPriority] = useState<PriorityFilter>("all");
+  const [sort, setSort] = useState<SortMode>("default");
 
-  // function to close the modal
-  const handleModalClose = () => {
-    setViewAllTaskModal(false);
-  };
+  const allTasks: any[] = activeProject?.allTasks || [];
+  const visible = useMemo(
+    () => filterAndSortTasks(allTasks, { search: searchKey, status, priority, sort }),
+    [allTasks, searchKey, status, priority, sort]
+  );
+  const filtersActive = searchKey !== "" || status !== "all" || priority !== "all";
 
-  const handleInputChange = (e: any) => {
-    const input = e.target.value.toLowerCase();
-
-    const tempTasks = activeProject?.allTasks?.filter((task: any) => {
-      const taskTitle = task.taskTitle.toLowerCase();
-      const taskId = task._id.toLowerCase();
-
-      return taskTitle.includes(input) || taskId.includes(input);
-    });
-    setSearchKey(input);
-    setFilteredTasks(tempTasks);
-  };
   return (
-    <div className="top-0 left-0 absolute w-[100vw] h-[100vh] bg-[#00000054] flex justify-center items-center">
+    <ModalOverlay onClose={() => setViewAllTaskModal(false)}>
       <div className="bg-C55 rounded-[8px] p-5 w-[90%] md:w-[700px]  md:min-h-[550px] md:max-h-[550px] shadow-xl ">
         <div className="flex flex-row items-center justify-between pb-3 ">
           <div className="font-bold text-[20px] text-C11">All Tasks</div>
-          <button className="cursor-pointer" onClick={handleModalClose}>
+          <button className="cursor-pointer" onClick={() => setViewAllTaskModal(false)} aria-label="Close">
             <Close sx={{ fontSize: 20, fontWeight: 800 }} />
           </button>
         </div>
-        {/* tasks  */}
+
         <input
           type="text"
           value={searchKey}
           placeholder="Filter by task ID or Task Title"
-          onChange={handleInputChange}
+          aria-label="Filter tasks by ID or title"
+          onChange={(e) => setSearchKey(e.target.value)}
           className="bg-C44 rounded-[8px]  p-2 text-[14px] w-full"
         />
-        <div className="flex flex-row items-center gap-5 w-full justify-end  rounded-[6px] text-[12px] p-1 mt-1">
-          <button
-          onClick={()=>setFilterMode('all')}
-          className={` ${filterMode==="all"?"bg-[#012b3927] text-C11":" text-gray-300"} rounded-[6px] font-bold   text-[10px] py-1 px-2`}
-          >All
-          </button>
-          <button
-           onClick={()=>setFilterMode('completed')}
-          className={` ${filterMode==="completed"?"bg-[#012b3927] text-C11":"text-gray-300"} font-bold rounded-[6px]   text-[10px] py-1 px-2`}
-          >Completed</button>
-          <button
-           onClick={()=>setFilterMode('in-progress')}
-          className={` ${filterMode==="in-progress"?"bg-[#012b3927] text-C11":"text-gray-300"} font-bold rounded-[6px] text-[10px] py-1 px-2`}
-          >In Progress</button>
+
+        <div className="flex flex-row flex-wrap items-center gap-x-5 gap-y-1 w-full justify-end rounded-[6px] text-[12px] p-1 mt-1">
+          <div className="flex flex-row items-center gap-1" role="group" aria-label="Filter by status">
+            {([["all", "All"], ["completed", "Completed"], ["in-progress", "In Progress"]] as [StatusFilter, string][]).map(([key, label]) => (
+              <button key={key} onClick={() => setStatus(key)} aria-pressed={status === key} className={chip(status === key)}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-row items-center gap-1" role="group" aria-label="Filter by priority">
+            {([["all", "Any priority"], ["High", "High"], ["Medium", "Medium"], ["Low", "Low"]] as [PriorityFilter, string][]).map(([key, label]) => (
+              <button key={key} onClick={() => setPriority(key)} aria-pressed={priority === key} className={chip(priority === key)}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <label className="flex flex-row items-center gap-1 font-bold text-[10px] text-C11">
+            Sort
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortMode)}
+              className="bg-C44 rounded-[6px] text-[10px] font-bold py-1 px-1"
+            >
+              <option value="default">Default</option>
+              <option value="due">Due date</option>
+              <option value="priority">Priority</option>
+            </select>
+          </label>
         </div>
-        <div className="flex items-center justify-center p-1 py-4">
-          {activeProject?.allTasks?.length !== 0 ? (
-            <div className="flex flex-col overflow-y-auto max-h-[400px] gap-2 w-full">
-              {searchKey === "" ? (
-                <>
-                  {activeProject?.allTasks?.map((node: any) => (
-                    <>
-                    {
-                    filterMode==="completed" && node?.taskStatus==="Completed"?
-                    <Tooltip title="View Task" arrow placement="right">
-                      <Link to={`/task-page?id=${node._id}`}>
-                        <div className="flex flex-row group rounded-[4px]  text-[12px] max-w-full break-words hover:bg-C44 cursor-pointer transition-all w-full items-center">
-                          <div className="flex flex-row flex-1">
-                            <div
-                              className={`group-hover:px-2 min-w-[10px] group-hover:min-w-[80px] duration-200 flex justify-center items-center  ${
-                                node?.taskPriority === "High"
-                                  ? "bg-highPriority"
-                                  : node.taskPriority === "Medium"
-                                  ? "bg-mediumPriority"
-                                  : "bg-lowPriority"
-                              } p-1 rounded-[4px] group-hover:rounded-l-[4px] group-hover:rounded-r-[0px] `}
-                            >
-                              <div className="hidden text-C55 font-semibold group-hover:flex duration-[1s]">
-                                {moment(node?.dueDate).format("LL")}
-                              </div>
-                            </div>
 
-                            <div
-                              className={`hidden group-hover:flex  min-w-[10px] group-hover:min-w-[80px] duration-200 justify-center items-center p-1   group-hover:rounded-r-[0px] bg-[#dedede] `}
-                            >
-                              <div className="hidden text-C11 font-semibold group-hover:flex duration-[1s]">
-                                {node?.taskStatus}
-                              </div>
-                            </div>
-                            <div className="p-2 max-w-[80%] break-words">
-                              {node?.taskTitle}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    </Tooltip>:
-                    filterMode==="in-progress"&&node?.taskStatus==="In Progress"?
-                    <Tooltip title="View Task" arrow placement="right">
-                    <Link to={`/task-page?id=${node._id}`}>
-                      <div className="flex flex-row group rounded-[4px]  text-[12px] max-w-full break-words hover:bg-C44 cursor-pointer transition-all w-full items-center">
-                        <div className="flex flex-row flex-1">
-                          <div
-                            className={`group-hover:px-2 min-w-[10px] group-hover:min-w-[80px] duration-200 flex justify-center items-center  ${
-                              node?.taskPriority === "High"
-                                ? "bg-highPriority"
-                                : node.taskPriority === "Medium"
-                                ? "bg-mediumPriority"
-                                : "bg-lowPriority"
-                            } p-1 rounded-[4px] group-hover:rounded-l-[4px] group-hover:rounded-r-[0px] `}
-                          >
-                            <div className="hidden text-C55 font-semibold group-hover:flex duration-[1s]">
-                              {moment(node?.dueDate).format("LL")}
-                            </div>
-                          </div>
+        <div className="flex items-center justify-between px-1 text-[10px] text-gray-400">
+          <span aria-live="polite">{`${visible.length} of ${allTasks.length} task${allTasks.length === 1 ? "" : "s"}`}</span>
+          {filtersActive && (
+            <button
+              className="font-bold text-C22 hover:text-C11"
+              onClick={() => {
+                setSearchKey("");
+                setStatus("all");
+                setPriority("all");
+              }}
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
 
-                          <div
-                            className={`hidden group-hover:flex  min-w-[10px] group-hover:min-w-[80px] duration-200 justify-center items-center p-1   group-hover:rounded-r-[0px] bg-[#dedede] `}
-                          >
-                            <div className="hidden text-C11 font-semibold group-hover:flex duration-[1s]">
-                              {node?.taskStatus}
-                            </div>
-                          </div>
-                          <div className="p-2 max-w-[80%] break-words">
-                            {node?.taskTitle}
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                    </Tooltip>:
-                    filterMode==="all"?
-                    <Tooltip title="View Task" arrow placement="right">
-                    <Link to={`/task-page?id=${node._id}`}>
-                      <div className="flex flex-row group rounded-[4px]  text-[12px] max-w-full break-words hover:bg-C44 cursor-pointer transition-all w-full items-center">
-                        <div className="flex flex-row flex-1">
-                          <div
-                            className={`group-hover:px-2 min-w-[10px] group-hover:min-w-[80px] duration-200 flex justify-center items-center  ${
-                              node?.taskPriority === "High"
-                                ? "bg-highPriority"
-                                : node.taskPriority === "Medium"
-                                ? "bg-mediumPriority"
-                                : "bg-lowPriority"
-                            } p-1 rounded-[4px] group-hover:rounded-l-[4px] group-hover:rounded-r-[0px] `}
-                          >
-                            <div className="hidden text-C55 font-semibold group-hover:flex duration-[1s]">
-                              {moment(node?.dueDate).format("LL")}
-                            </div>
-                          </div>
-
-                          <div
-                            className={`hidden group-hover:flex  min-w-[10px] group-hover:min-w-[80px] duration-200 justify-center items-center p-1   group-hover:rounded-r-[0px] bg-[#dedede] `}
-                          >
-                            <div className="hidden text-C11 font-semibold group-hover:flex duration-[1s]">
-                              {node?.taskStatus}
-                            </div>
-                          </div>
-                          <div className="p-2 max-w-[80%] break-words">
-                            {node?.taskTitle}
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                    </Tooltip>: null
-                    }
-                    </>
-                  ))}
-                </>
-              ) : (
-                <>
-                  {filteredTasks.length !== 0 ? (
-                    <>
-                  {filteredTasks?.map((node: any) => (
-                    <>
-                    {
-                    filterMode==="completed" && node?.taskStatus==="Completed"?
-                    <Tooltip title="View Task" arrow placement="right">
-                      <Link to={`/task-page?id=${node._id}`}>
-                        <div className="flex flex-row group rounded-[4px]  text-[12px] max-w-full break-words hover:bg-C44 cursor-pointer transition-all w-full items-center">
-                          <div className="flex flex-row flex-1">
-                            <div
-                              className={`group-hover:px-2 min-w-[10px] group-hover:min-w-[80px] duration-200 flex justify-center items-center  ${
-                                node?.taskPriority === "High"
-                                  ? "bg-highPriority"
-                                  : node.taskPriority === "Medium"
-                                  ? "bg-mediumPriority"
-                                  : "bg-lowPriority"
-                              } p-1 rounded-[4px] group-hover:rounded-l-[4px] group-hover:rounded-r-[0px] `}
-                            >
-                              <div className="hidden text-C55 font-semibold group-hover:flex duration-[1s]">
-                                {moment(node?.dueDate).format("LL")}
-                              </div>
-                            </div>
-
-                            <div
-                              className={`hidden group-hover:flex  min-w-[10px] group-hover:min-w-[80px] duration-200 justify-center items-center p-1   group-hover:rounded-r-[0px] bg-[#dedede] `}
-                            >
-                              <div className="hidden text-C11 font-semibold group-hover:flex duration-[1s]">
-                                {node?.taskStatus}
-                              </div>
-                            </div>
-                            <div className="p-2 max-w-[80%] break-words">
-                              {node?.taskTitle}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    </Tooltip>:
-                    filterMode==="in-progress"&&node?.taskStatus==="In Progress"?
-                    <Tooltip title="View Task" arrow placement="right">
-                    <Link to={`/task-page?id=${node._id}`}>
-                      <div className="flex flex-row group rounded-[4px]  text-[12px] max-w-full break-words hover:bg-C44 cursor-pointer transition-all w-full items-center">
-                        <div className="flex flex-row flex-1">
-                          <div
-                            className={`group-hover:px-2 min-w-[10px] group-hover:min-w-[80px] duration-200 flex justify-center items-center  ${
-                              node?.taskPriority === "High"
-                                ? "bg-highPriority"
-                                : node.taskPriority === "Medium"
-                                ? "bg-mediumPriority"
-                                : "bg-lowPriority"
-                            } p-1 rounded-[4px] group-hover:rounded-l-[4px] group-hover:rounded-r-[0px] `}
-                          >
-                            <div className="hidden text-C55 font-semibold group-hover:flex duration-[1s]">
-                              {moment(node?.dueDate).format("LL")}
-                            </div>
-                          </div>
-
-                          <div
-                            className={`hidden group-hover:flex  min-w-[10px] group-hover:min-w-[80px] duration-200 justify-center items-center p-1   group-hover:rounded-r-[0px] bg-[#dedede] `}
-                          >
-                            <div className="hidden text-C11 font-semibold group-hover:flex duration-[1s]">
-                              {node?.taskStatus}
-                            </div>
-                          </div>
-                          <div className="p-2 max-w-[80%] break-words">
-                            {node?.taskTitle}
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                    </Tooltip>:
-                    filterMode==="all"?
-                    <Tooltip title="View Task" arrow placement="right">
-                    <Link to={`/task-page?id=${node._id}`}>
-                      <div className="flex flex-row group rounded-[4px]  text-[12px] max-w-full break-words hover:bg-C44 cursor-pointer transition-all w-full items-center">
-                        <div className="flex flex-row flex-1">
-                          <div
-                            className={`group-hover:px-2 min-w-[10px] group-hover:min-w-[80px] duration-200 flex justify-center items-center  ${
-                              node?.taskPriority === "High"
-                                ? "bg-highPriority"
-                                : node.taskPriority === "Medium"
-                                ? "bg-mediumPriority"
-                                : "bg-lowPriority"
-                            } p-1 rounded-[4px] group-hover:rounded-l-[4px] group-hover:rounded-r-[0px] `}
-                          >
-                            <div className="hidden text-C55 font-semibold group-hover:flex duration-[1s]">
-                              {moment(node?.dueDate).format("LL")}
-                            </div>
-                          </div>
-
-                          <div
-                            className={`hidden group-hover:flex  min-w-[10px] group-hover:min-w-[80px] duration-200 justify-center items-center p-1   group-hover:rounded-r-[0px] bg-[#dedede] `}
-                          >
-                            <div className="hidden text-C11 font-semibold group-hover:flex duration-[1s]">
-                              {node?.taskStatus}
-                            </div>
-                          </div>
-                          <div className="p-2 max-w-[80%] break-words">
-                            {node?.taskTitle}
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                    </Tooltip>: null
-                    }
-                    </>
-                      ))}
-                    </>
-                  ) : (
-                    <div className="mt-[20%]">
-                      <NoDataMessage
-                        size="small"
-                        message={`No Tasks Found based on "${searchKey}"`}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
+        <div className="flex items-center justify-center p-1 py-2">
+          {allTasks.length === 0 ? (
+            <div className="mt-[20%]">
+              <NoDataMessage size="small" message="Currently No Tasks in this Project" />
+            </div>
+          ) : visible.length === 0 ? (
+            <div className="mt-[20%]">
+              <NoDataMessage size="small" message="No tasks match the current filters" />
             </div>
           ) : (
-            <div className="mt-[20%]">
-              <NoDataMessage
-                size="small"
-                message="Currently No Tasks in this Project"
-              />
+            <div className="flex flex-col overflow-y-auto max-h-[360px] gap-2 w-full">
+              {visible.map((task: any) => (
+                <TaskRow key={task._id} task={task} />
+              ))}
             </div>
           )}
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 

@@ -7,7 +7,6 @@ import ErrorBoundary from "./common/ErrorBoundary";
 import HomePage from "./pages/HomePage";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";
 import ErrorPage from "./pages/ErrorPage";
 
 // The authenticated app is split into its own chunks so the landing/login pages load fast.
@@ -32,7 +31,6 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/project-page" element={<ProjectPage />} />
             <Route path="/task-page" element={<TaskPage />} />

@@ -1,5 +1,6 @@
 import { Close } from '@mui/icons-material'
 import React, { useState } from 'react'
+import ModalOverlay from '../common/ModalOverlay';
 import { deleteTaskById } from '../services/taskServices'
 import APIResponseStatus from '../common/APIResponseStatus'
 import { Link } from 'react-router-dom'
@@ -27,7 +28,7 @@ function DeleteTaskConfirmationModal(props:any) {
         setDeleteTaskModal(false)
     }
   return (
-    <div className='top-0 left-0 absolute w-[100vw] h-[100vh] bg-[#00000054] flex justify-center items-center'>
+    <ModalOverlay onClose={() => setDeleteTaskModal(false)}>
     <div className='bg-C55 rounded-[8px] p-5 w-[90%] md:w-[500px] shadow-xl' >
       <div className='flex flex-row items-center justify-between'>
       <div className='font-bold text-[20px] text-C11'>
@@ -36,7 +37,7 @@ function DeleteTaskConfirmationModal(props:any) {
       {deleteTaskStatus!=="delete-success"?
       <button className='cursor-pointer'
       onClick={handleModalClose}
-      >
+       aria-label="Close">
         <Close sx={{fontSize:20,fontWeight:800}}/>
       </button>:null
        }
@@ -81,7 +82,7 @@ function DeleteTaskConfirmationModal(props:any) {
         }
       </div> 
     </div>
-  </div>
+  </ModalOverlay>
   )
 }
 

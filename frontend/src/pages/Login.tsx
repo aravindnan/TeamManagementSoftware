@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import Logo from "../common/Logo";
 import { colors } from "../Constants";
 import { Link, useNavigate } from "react-router-dom";
-import ForgotPasswordModal from "../modals/ForgotPasswordModal";
 import {Visibility, VisibilityOff } from "@mui/icons-material";
 import ErrorBox from "../common/ErrorBox";
 import { getMe, loginUser } from "../services/authServices";
@@ -16,7 +15,6 @@ import * as authActions from "../redux/actions/authActions"
 function Login() {
   const dispatch = useDispatch()
   const [showPassword, setShowPassword] = useState<Boolean>(false);
-  const [forgotPasswordModal, setForgotPasswordModal] = useState<Boolean>(false);
   const [loginStatus,setLoginStatus] = useState<any>("not-loggedin")
   const [error, setError] = useState<string | null>(null);
   const [apiResponseMessage,setApiResponseMessage] = useState<string>("")
@@ -160,15 +158,6 @@ function Login() {
                 )}
               </div>
             </div>
-            {/* <Link to={"/forgot-password"}>
-              <div
-                className={`text-[11px] text-C22 hover:text-C11 cursor-pointer text-right hover:underline underline-offset-1`}
-                onClick={() => setForgotPasswordModal(true)}
-              >
-                Forgot Password ?
-              </div>
-            </Link> */}
-
             {error ? <ErrorBox message={error} /> : null}
           </div>
 
@@ -250,7 +239,6 @@ function Login() {
           }
         </div>
         {/*Forgot Password Modal  */}
-        {forgotPasswordModal && <ForgotPasswordModal />}
       </div>
     </>
   );

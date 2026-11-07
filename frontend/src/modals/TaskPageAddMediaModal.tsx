@@ -1,6 +1,7 @@
 import { AttachFile, Close, FolderZip, Image, InsertDriveFile, UploadFile } from '@mui/icons-material';
 import { Tooltip } from '@mui/material';
 import React, { useEffect, useRef, useState } from 'react'
+import ModalOverlay from '../common/ModalOverlay';
 import ErrorBox from '../common/ErrorBox';
 import { addMediaToTask } from '../services/taskServices';
 import { uploadFiles } from '../services/uploadServices';
@@ -65,13 +66,13 @@ function TaskPageAddMediaModal(props:any) {
 
   
     return (
-      <div className="top-0 left-0 absolute w-[100vw] h-[100vh] bg-[#00000054] flex justify-center items-center">
+      <ModalOverlay onClose={() => setAddMediaModal(false)}>
       <div className="bg-C55 rounded-[8px] p-5 w-[90%] md:min-w-[550px] max-w-[550px] shadow-xl">
         <div className="flex flex-row items-center justify-between">
           <div className="font-bold text-[20px] text-C11">
             Add New Media To Project
           </div>
-          <button className="cursor-pointer" onClick={handleModalClose}>
+          <button className="cursor-pointer" onClick={handleModalClose} aria-label="Close">
             <Close sx={{ fontSize: 20, fontWeight: 800 }} />
           </button>
         </div>
@@ -157,7 +158,7 @@ function TaskPageAddMediaModal(props:any) {
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
     );
 }
 

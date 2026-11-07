@@ -1,6 +1,7 @@
 import { Close } from "@mui/icons-material";
 import { Tooltip } from "@mui/material";
 import React, { useState } from "react";
+import ModalOverlay from '../common/ModalOverlay';
 import DeleteMediaConfirmationModal from "./DeleteMediaConfirmationModal";
 import DeleteTaskMediaConfirmationModal from "./DeleteTaskMediaConfirmationModal";
 function ViewMediaModal(props: any) {
@@ -13,13 +14,13 @@ function ViewMediaModal(props: any) {
     setViewMediaModal({[`isOpen`]:false,[`mediaData`]:null});
   };
   return (
-    <div className="top-0 left-0 absolute w-[100vw] h-[100vh] bg-[#00000054] flex justify-center items-center">
+    <ModalOverlay onClose={() => setViewMediaModal({[`isOpen`]:false,[`mediaData`]:null})}>
       <div className="bg-C55 rounded-[8px] p-5 shadow-xl  max-w-[90%] max-h-[520px]">
         <div className="flex flex-row items-center justify-between">
           <div className="font-bold text-[20px] text-C11">
             {mediaData.mediaName}
           </div>
-          <button className="cursor-pointer" onClick={handleModalClose}>
+          <button className="cursor-pointer" onClick={handleModalClose} aria-label="Close">
             <Close sx={{ fontSize: 20, fontWeight: 800 }} />
           </button>
         </div>
@@ -124,7 +125,7 @@ function ViewMediaModal(props: any) {
       />
       }
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 

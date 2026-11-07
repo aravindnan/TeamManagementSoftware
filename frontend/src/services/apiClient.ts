@@ -7,7 +7,7 @@ import { logoutAction } from "../redux/actions/authActions";
 // so every request just has to send credentials.
 export const api = axios.create({ baseURL: ENV, withCredentials: true, timeout: 20000 });
 
-const PUBLIC_PATHS = ["/", "/login", "/register", "/forgot-password"];
+const PUBLIC_PATHS = ["/", "/login", "/register"];
 
 api.interceptors.response.use(
   (response) => response,

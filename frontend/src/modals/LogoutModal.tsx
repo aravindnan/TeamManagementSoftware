@@ -1,5 +1,6 @@
 import { Close } from '@mui/icons-material'
 import React, { useState } from 'react'
+import ModalOverlay from '../common/ModalOverlay';
 import { logoutUser } from '../services/authServices'
 import { useNavigate } from 'react-router'
 import APIResponseStatus from '../common/APIResponseStatus'
@@ -37,7 +38,7 @@ function LogoutModal(props:any) {
 
 
   return (
- <div className='top-0 left-0 absolute w-[100vw] h-[100vh] bg-[#00000054] flex justify-center items-center'>
+ <ModalOverlay onClose={() => setLogoutModal(false)}>
     <div className='bg-C55 rounded-[8px] p-5 w-[90%] md:max-w-[500px] max-h-[300px] shadow-xl' >
     <div className='flex flex-row items-center justify-between'>
       <div className='font-bold text-[20px] text-C11 '>
@@ -46,19 +47,19 @@ function LogoutModal(props:any) {
       {logoutStatus!=="logout-loading"?
       <button className='cursor-pointer'
       onClick={handleModalClose}
-      >
+       aria-label="Close">
         <Close sx={{fontSize:20,fontWeight:800}}/>
       </button>:
       logoutStatus==="logout-failure"?
       <button className='cursor-pointer'
       onClick={handleModalClose}
-      >
+       aria-label="Close">
         <Close sx={{fontSize:20,fontWeight:800}}/>
       </button>:
       logoutStatus==="not-loggedout"?
       <button className='cursor-pointer'
       onClick={handleModalClose}
-      >
+       aria-label="Close">
         <Close sx={{fontSize:20,fontWeight:800}}/>
       </button>:null
 
@@ -87,7 +88,7 @@ function LogoutModal(props:any) {
       }
 
     </div>
-  </div>
+  </ModalOverlay>
   )
 }
 

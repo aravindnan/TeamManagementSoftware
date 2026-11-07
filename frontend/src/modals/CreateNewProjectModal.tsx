@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import ModalOverlay from '../common/ModalOverlay';
 import ErrorBox from "../common/ErrorBox";
 import { createNewProject } from "../services/projectServices";
 import { useSelector } from "react-redux";
@@ -85,7 +86,7 @@ function CreateNewProjectModal(props: any) {
   };
 
   return (
-    <div className="top-0 left-0 absolute w-[100vw] h-[100vh] bg-[#00000054] flex justify-center items-center">
+    <ModalOverlay onClose={() => setCreateNewProjectModal(false)}>
       <div className="bg-C55 rounded-[8px] p-5 w-[90%] md:w-[700px] shadow-xl">
         <div className="font-bold text-[20px] text-C11">New Project</div>
         <div className="my-1 mt-2 text-[14px] flex flex-col gap-2 ">
@@ -186,7 +187,7 @@ function CreateNewProjectModal(props: any) {
 
 
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
