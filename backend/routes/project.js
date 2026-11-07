@@ -11,6 +11,7 @@ router.get("/get-project-by-id/:projectId", validate({ params: pid }), c.get_pro
 router.get("/get-project-members-by-id/:projectId", validate({ params: pid }), c.get_project_members_by_id);
 router.get("/get-all-tasks-by-project-id/:projectId", validate({ params: pid }), c.get_all_tasks_by_project_id);
 router.get("/get-project-activity-by-id/:projectId", validate({ params: pid, query: s.activityQuery }), c.get_project_activity_by_id);
+router.get("/get-project-analytics-by-id/:projectId", validate({ params: pid }), c.get_project_analytics_by_id);
 router.get("/get-project-risk-by-id/:projectId", validate({ params: pid }), c.get_project_risk_by_id);
 router.get("/get-project-overall-performance-by-id/:projectId", validate({ params: pid }), c.get_project_overall_performance_by_id);
 

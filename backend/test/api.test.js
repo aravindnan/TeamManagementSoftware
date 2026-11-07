@@ -254,6 +254,50 @@ describe("projects & tasks", () => {
   });
 });
 
+describe("analytics", () => {
+  async function scene() {
+    const m = await signup(1), t = await signup(2), outsider = await signup(3);
+    const projectId = (await m.a.post(`/create-new-project-for-user-id/${m.id}`).send({ projectName: "Proj" })).body.project._id;
+    await m.a.post(`/add-new-member-by-project-id/${projectId}`).send({ memberId: t.id });
+    const mk = (title, who) => m.a.post(`/add-new-task-by-project-id/${projectId}`).send({ taskTitle: title, dueDate: "2020-01-01", assignedTo: who });
+    const a = await mk("A", t.id), b = await mk("B", t.id), c = await mk("C", m.id);
+    return { m, t, outsider, projectId, a: a.body.taskId, b: b.body.taskId, c: c.body.taskId };
+  }
+
+  test("members only", async () => {
+    const { outsider, projectId } = await scene();
+    await outsider.a.get(`/get-project-analytics-by-id/${projectId}`).expect(403);
+  });
+
+  test("reports flow metrics that follow task movement", async () => {
+    const { m, t, projectId, a, b } = await scene();
+    await t.a.put(`/change-task-status-by-id/${a}`).send({ newStatus: "In Progress" }).expect(200);
+    await t.a.put(`/change-task-status-by-id/${b}`).send({ newStatus: "Completed" }).expect(200);
+    const r = (await m.a.get(`/get-project-analytics-by-id/${projectId}`).expect(200)).body;
+    expect(r.summary).toMatchObject({ total: 3, open: 2, completed: 1, overdue: 2, completionRate: 33 });
+    expect(r.cycleTime.sampleSize).toBe(1);
+    expect(r.throughput).toHaveLength(8);
+    expect(r.throughput[7].completed).toBe(1); // completed just now -> current week
+    expect(r.burnup).toHaveLength(30);
+    expect(r.burnup[29]).toMatchObject({ created: 3, completed: 1 });
+    expect(r.aging.map((x) => x.taskId)).toEqual([a]);
+    expect(r.aging[0].daysInColumn).toBeLessThan(1); // moved moments ago, per the activity log
+  });
+
+  test("the manager sees everyone; a member only sees their own row", async () => {
+    const { m, t, projectId } = await scene();
+    const asManager = (await m.a.get(`/get-project-analytics-by-id/${projectId}`)).body;
+    expect(asManager.scope).toBe("all");
+    expect(asManager.byAssignee.map((p) => p.assignedTo).sort()).toEqual([m.id, t.id].sort());
+    const asMember = (await t.a.get(`/get-project-analytics-by-id/${projectId}`)).body;
+    expect(asMember.scope).toBe("self");
+    expect(asMember.byAssignee).toHaveLength(1);
+    expect(asMember.byAssignee[0]).toMatchObject({ assignedTo: t.id, open: 2 });
+    // project-level figures are the same for both
+    expect(asMember.summary).toEqual(asManager.summary);
+  });
+});
+
 describe("activity feed", () => {
   async function scene() {
     const m = await signup(1), t = await signup(2), outsider = await signup(3);

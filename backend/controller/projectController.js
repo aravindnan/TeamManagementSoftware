@@ -7,6 +7,7 @@ const { notFound, badRequest, conflict, forbidden } = require("../utils/AppError
 const { PUBLIC_USER_FIELDS, idEq, isManager, isMember, loadProject, requireMember, requireManager } = require("../utils/access");
 const { deleteTasksCascade } = require("../utils/cascade");
 const { assessProject } = require("../utils/risk");
+const { computeAnalytics } = require("../utils/analytics");
 const Activity = require("../model/activity");
 const Notification = require("../model/notification");
 const { logActivity, fullName, excerpt } = require("../utils/activity");
@@ -63,6 +64,28 @@ exports.get_project_activity_by_id = asyncHandler(async (req, res) => {
   const hasMore = rows.length > limit;
   const items = hasMore ? rows.slice(0, limit) : rows;
   res.status(200).json({ items, nextCursor: hasMore ? String(items[items.length - 1]._id) : null });
+});
+
+exports.get_project_analytics_by_id = asyncHandler(async (req, res) => {
+  const project = await loadProject(req.params.projectId);
+  requireMember(project, req.user.id);
+
+  const [tasks, lastMoves] = await Promise.all([
+    Task.find({ project: project._id }).lean(),
+    // when each task last changed column, from the activity log
+    Activity.aggregate([
+      { $match: { project: project._id, verb: "task.status_changed", task: { $exists: true } } },
+      { $sort: { _id: -1 } },
+      { $group: { _id: "$task", at: { $first: "$createdAt" } } },
+    ]),
+  ]);
+  const statusChangedAt = Object.fromEntries(lastMoves.map((m) => [String(m._id), new Date(m.at).getTime()]));
+  const analytics = computeAnalytics(tasks, statusChangedAt);
+
+  // Per-person figures are the manager's view; everyone else only sees their own row.
+  const manager = isManager(project, req.user.id);
+  if (!manager) analytics.byAssignee = analytics.byAssignee.filter((p) => p.assignedTo === req.user.id);
+  res.status(200).json({ ...analytics, scope: manager ? "all" : "self" });
 });
 
 exports.get_project_risk_by_id = asyncHandler(async (req, res) => {

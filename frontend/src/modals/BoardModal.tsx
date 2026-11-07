@@ -3,10 +3,11 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import ModalOverlay from "../common/ModalOverlay";
 import KanbanBoard from "../components/KanbanBoard";
 import RiskRadar from "../components/RiskRadar";
-import { getProjectRisk } from "../services/projectServices";
+import InsightsPanel from "../components/InsightsPanel";
+import { getProjectAnalytics, getProjectRisk } from "../services/projectServices";
 import { errorMessage, isApiError } from "../services/apiClient";
 
-type View = "board" | "radar";
+type View = "board" | "radar" | "insights";
 
 function BoardModal(props: any) {
   const { activeProject, myProfiledata, setBoardModal, triggerRerender } = props;
@@ -14,6 +15,11 @@ function BoardModal(props: any) {
   const [view, setView] = useState<View>("board");
   const [risk, setRisk] = useState<any | null>(null);
   const [riskError, setRiskError] = useState<string | null>(null);
+  const [insights, setInsights] = useState<any | null>(null);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
+  // Bumped on every card move so the (lazily loaded) insights are refreshed the next time they are opened.
+  const [version, setVersion] = useState(0);
+  const loadedVersion = useRef(-1);
 
   const loadRisk = useCallback(async () => {
     const res: any = await getProjectRisk(activeProject?._id);
@@ -28,6 +34,22 @@ function BoardModal(props: any) {
   useEffect(() => {
     loadRisk();
   }, [loadRisk]);
+
+  const loadInsights = useCallback(async () => {
+    loadedVersion.current = version;
+    const res: any = await getProjectAnalytics(activeProject?._id);
+    if (isApiError(res) || !res?.summary) {
+      loadedVersion.current = -1; // allow a retry
+      setInsightsError(errorMessage(res, "Could not load insights."));
+    } else {
+      setInsights(res);
+      setInsightsError(null);
+    }
+  }, [activeProject?._id, version]);
+
+  useEffect(() => {
+    if (view === "insights" && loadedVersion.current !== version) loadInsights();
+  }, [view, version, loadInsights]);
 
   // The page's own task lists are refreshed once, when the modal closes (moves are already optimistic here).
   const close = () => {
@@ -65,6 +87,7 @@ function BoardModal(props: any) {
         <div role="tablist" aria-label="Project views" className="flex flex-row gap-1 pb-2">
           {tab("board", "Board")}
           {tab("radar", "Risk radar", atRiskCount)}
+          {tab("insights", "Insights")}
         </div>
 
         {/* Both panels stay mounted so optimistic board state survives switching tabs. */}
@@ -76,11 +99,15 @@ function BoardModal(props: any) {
             onChanged={() => {
               changed.current = true;
               loadRisk(); // a move changes the risk picture
+              setVersion((v) => v + 1);
             }}
           />
         </div>
         <div id="panel-radar" role="tabpanel" aria-labelledby="tab-radar" className={view === "radar" ? "flex flex-col flex-1 min-h-0" : "hidden"}>
           <RiskRadar risk={risk} error={riskError} project={activeProject} onRetry={loadRisk} />
+        </div>
+        <div id="panel-insights" role="tabpanel" aria-labelledby="tab-insights" className={view === "insights" ? "flex flex-col flex-1 min-h-0" : "hidden"}>
+          <InsightsPanel data={insights} error={insightsError} project={activeProject} onRetry={loadInsights} />
         </div>
       </div>
     </ModalOverlay>
