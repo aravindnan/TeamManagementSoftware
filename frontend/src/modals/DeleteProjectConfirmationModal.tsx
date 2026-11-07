@@ -16,13 +16,8 @@ function DeleteProjectConfirmationModal(props:any) {
     const handleDelete =async()=>{
       setDeleteProjectStatus("delete-loading")
 
-      await deleteProjectById(activeProject?._id).then((res:any)=>{
-        if(res?.deleteStatus){
-          setDeleteProjectStatus("delete-success")
-        }
-      }).catch((err:any)=>{
-        setDeleteProjectStatus("delete-failure")
-      })
+      const res: any = await deleteProjectById(activeProject?._id)
+      setDeleteProjectStatus(res?.deleteStatus ? "delete-success" : "delete-failure")
       
     }
 

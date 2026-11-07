@@ -14,14 +14,13 @@ function RemoveMemberConfirmationModal(props:any) {
       const userData = {
         memberId:memberData?._id
       }
-      await deleteMemberFromProject(activeProject._id,userData).then((res:any)=>{
-        if(res?.deleteStatus){
-          setDeleteMemberStatus("delete-success")
-          triggerRerender()
-        }
-      }).catch((err:any)=>{
+      const res: any = await deleteMemberFromProject(activeProject._id,userData)
+      if (res?.deleteStatus) {
+        setDeleteMemberStatus("delete-success")
+        triggerRerender()
+      } else {
         setDeleteMemberStatus("delete-failure")
-      })
+      }
     }
 
     const handleModalClose =()=>{

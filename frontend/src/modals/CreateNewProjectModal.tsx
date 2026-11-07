@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import ModalOverlay from '../common/ModalOverlay';
 import ErrorBox from "../common/ErrorBox";
+import { errorMessage } from "../services/apiClient";
 import { createNewProject } from "../services/projectServices";
 import { useSelector } from "react-redux";
 import APIResponseStatus from "../common/APIResponseStatus";
@@ -64,16 +65,16 @@ function CreateNewProjectModal(props: any) {
     if (validateBeforeSubmit()) {
       setCreateProjectStatus("create-loading")
       // Perform registration logic here call API
-      await createNewProject(createProjectFormData,myProfiledata._id).then((res:any)=>{
+      const res: any = await createNewProject(createProjectFormData,myProfiledata._id)
+      if (res?.project?._id) {
         setCreateProjectFormData(emptyState)
         setCreateProjectStatus("create-success")
-        setCreatedProjectId(res?.project?._id);
+        setCreatedProjectId(res.project._id);
         triggerRerender()
-
-      }).catch((err:any)=>{
+      } else {
         setCreateProjectStatus("create-failure")
-        setApiResponseMessage(err.response.data.error)
-      })
+        setApiResponseMessage(errorMessage(res, "Could not create the project"))
+      }
     } else {
       // Display error message
     }

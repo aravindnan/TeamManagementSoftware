@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import Logo from '../common/Logo'
 import { colors } from '../Constants'
 import { getMe } from '../services/authServices'
-import { useSelector } from 'react-redux'
 
 function HomePage() {
     document.title="TMS • Home"
@@ -15,12 +14,7 @@ function HomePage() {
         })
     },[])
 
-    const navigate = useNavigate()
 
-    const myProfiledata = useSelector(
-        (state: any) => state.authReducer.myUserProfile
-      );
-    
   return (
     <div>
         <div className='flex flex-row items-center justify-between bg-C44 h-[60px] px-10'>

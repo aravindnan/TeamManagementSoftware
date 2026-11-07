@@ -44,46 +44,45 @@ function TaskPage() {
   },[activeTask])
 
   useEffect(() => {
-    getMyProfileData()
-  }, []);
-
-  const getMyProfileData = async () => {
-    const res: any = await getMe()
-    if (res === null) {
-      navigate("/login")
-    } else if (res?._id) {
-      dispatch(authActions.loginAction(res))
-    } else {
-      setNetworkError(res?.code === "ERR_NETWORK")
-    }
-  }
+    let cancelled = false
+    ;(async () => {
+      const res: any = await getMe()
+      if (cancelled) return
+      if (res === null) {
+        navigate("/login")
+      } else if (res?._id) {
+        dispatch(authActions.loginAction(res))
+      } else {
+        setNetworkError(res?.code === "ERR_NETWORK")
+      }
+    })()
+    return () => { cancelled = true }
+  }, [navigate, dispatch]);
     
   const myProfiledata = useSelector(
     (state: any) => state.authReducer.myUserProfile
   );
 
   useEffect(() => {
-    const queryString = window.location.search;
-    let urlParams = new URLSearchParams(queryString);
-    const taskId = urlParams.get("id");
-    if (taskId) {
-      getTaskData(taskId)
-    }
-    else{
+    const taskId = new URLSearchParams(window.location.search).get("id");
+    if (!taskId) {
       navigate("/not-found", { replace: true })
+      return
     }
-  }, [rerender]);
-
-  const getTaskData = async (taskId: string) => {
-    const res: any = await getTaskById(taskId)
-    if (res?._id) {
-      setPageLoading("loaded")
-      setActiveTask(res)
-    } else {
-      setNetworkError(res?.code === "ERR_NETWORK")
-      setPageLoading("error")
-    }
-  }
+    let cancelled = false
+    ;(async () => {
+      const res: any = await getTaskById(taskId)
+      if (cancelled) return
+      if (res?._id) {
+        setPageLoading("loaded")
+        setActiveTask(res)
+      } else {
+        setNetworkError(res?.code === "ERR_NETWORK")
+        setPageLoading("error")
+      }
+    })()
+    return () => { cancelled = true }
+  }, [rerender, navigate]);
 
   const triggerRerender = () => {
     setRerender((prev) => !prev);

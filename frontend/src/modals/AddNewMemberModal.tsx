@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import ModalOverlay from '../common/ModalOverlay';
 import { Close } from "@mui/icons-material";
 import ErrorBox from "../common/ErrorBox";
@@ -27,23 +27,25 @@ function AddNewMemberModal(props: any) {
     return () => clearTimeout(timer);
   }, [error]);
 
-  useEffect(()=>{
-    if(allUsers.length===0){
-      setLoading(true)
-      getUsers()
-    }
-  },[])
+  // People who can still be added: everyone except those already on the project.
+  const memberIds = (activeProject?.projectMembers || []).map((m: any) => m._id)
+  const memberKey = memberIds.join(",")
 
-  const getUsers =async()=>{
-     await getAllUsers().then((res:any)=>{
-        const tempARRAY= res.filter((user:any)=>(user._id!==myProfiledata?._id))
-        if(tempARRAY.length>0){
-          setLoading(false)
-        }
-        setAllUsers(tempARRAY)
-      })
+  const getUsers = useCallback(async () => {
+    const res: any = await getAllUsers()
+    if (Array.isArray(res)) {
+      setAllUsers(res.filter((user: any) => user._id !== myProfiledata?._id && !memberKey.split(",").includes(user._id)))
+    } else {
+      setError("Could not load users. Please try again.")
     }
-    
+    setLoading(false) // also when the list is empty or the request failed, so the modal never hangs
+  }, [myProfiledata?._id, memberKey])
+
+  useEffect(() => {
+    setLoading(true)
+    getUsers()
+  }, [getUsers])
+
   
   
   const emptyState = {
@@ -73,14 +75,14 @@ function AddNewMemberModal(props: any) {
     // Add your validation logic here
     if (validateBeforeSubmit()) {
       setAddNewMemberStatus("add-loading")
-      await addMemberToProject(activeProject?._id,addMemberFormData).then((res:any)=>{
-        const tempOBJ = res.data
+      const res: any = await addMemberToProject(activeProject?._id,addMemberFormData)
+      if (res?.project?._id) {
         triggerRerender()
         setAddMemberFormData(emptyState)
         setAddNewMemberStatus("add-success")
-      }).catch((err:any)=>{
+      } else {
         setAddNewMemberStatus("add-failure")
-      })
+      }
 
       setAddMemberFormData(emptyState)
       // setAddNewTaskFormData(emptyState);
@@ -142,7 +144,7 @@ function AddNewMemberModal(props: any) {
         addNewMemberStatus === "add-success"?
           <APIResponseStatus status={true} message="Memeber Added to Project"/>:
           addNewMemberStatus === "add-failure"?
-           <APIResponseStatus status={true} message="Failed To Add Member"/>:
+           <APIResponseStatus status={false} message="Failed To Add Member"/>:
        null
         }
 

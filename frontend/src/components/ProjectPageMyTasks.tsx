@@ -9,15 +9,8 @@ function ProjectPageMyTasks(props:any) {
 
   const {myProfiledata,activeProject,myTasks,setMytasks} = props
   useEffect(() => {
-    filterMyTasks();
-  }, [activeProject, myProfiledata]);
-  
-  const filterMyTasks = () => {
-    const myTasksTemp = activeProject?.allTasks?.filter(
-      (task: any) => task.assignedTo === myProfiledata?._id
-    );
-    setMytasks(myTasksTemp);
-  };
+    setMytasks(activeProject?.allTasks?.filter((task: any) => task.assignedTo === myProfiledata?._id));
+  }, [activeProject, myProfiledata, setMytasks]);
   
 
 

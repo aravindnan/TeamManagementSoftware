@@ -8,17 +8,13 @@ import { getMe, loginUser } from "../services/authServices";
 import { errorMessage } from "../services/apiClient";
 import APIResponseStatus from "../common/APIResponseStatus";
 import { Tooltip } from "@mui/material";
-import { useDispatch, useSelector } from "react-redux";
-import * as authActions from "../redux/actions/authActions"
 
 
 function Login() {
-  const dispatch = useDispatch()
   const [showPassword, setShowPassword] = useState<Boolean>(false);
   const [loginStatus,setLoginStatus] = useState<any>("not-loggedin")
   const [error, setError] = useState<string | null>(null);
   const [apiResponseMessage,setApiResponseMessage] = useState<string>("")
-  const [loginUserId,setLoginUserId]=useState<any>(null)
   const navigate = useNavigate();
 
 
@@ -100,10 +96,6 @@ function Login() {
       // Display error message
     }
   };
-
-  const myProfiledata = useSelector(
-    (state: any) => state.authReducer.myUserProfile
-  );
 
   return (
     <>

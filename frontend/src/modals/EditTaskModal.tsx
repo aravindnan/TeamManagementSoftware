@@ -67,16 +67,14 @@ function EditTaskModal(props: any) {
     if (validateBeforeSubmit()) {
       setEditTaskStatus("edit-loading")
       // Perform registration logic here call API
-      await editTaskById(activeTask?._id,editTaskFormData).then((res:any)=>{
-        if(res.editStatus){
-          setEditTaskStatus("edit-success")
-          setEditTaskFormData(emptyState)
-          triggerRerender()
-        }
-      }).catch((err:any)=>{
-        setEditTaskStatus("edit-failure")
+      const res: any = await editTaskById(activeTask?._id,editTaskFormData)
+      if (res?.editStatus) {
+        setEditTaskStatus("edit-success")
         setEditTaskFormData(emptyState)
-      })
+        triggerRerender()
+      } else {
+        setEditTaskStatus("edit-failure")
+      }
       // setAddNewTaskFormData(emptyState);
     } else {
       // Display error message

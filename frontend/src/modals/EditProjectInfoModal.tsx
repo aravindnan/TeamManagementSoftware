@@ -59,16 +59,14 @@ function EditProjectInfoModal(props: any) {
     if (validateBeforeSubmit()) {
       setEditProjectStatus("edit-loading")
       // Perform registration logic here call API
-      await editProjectById(activeProject?._id,editProjectFormData).then((res:any)=>{
-        if(res.status){
-          setEditProjectStatus("edit-success")
-          triggerRerender()
-          setEditProjectFormData(emptyState)
-        }
-      }).catch((err:any)=>{
-        setEditProjectStatus("edit-failure")
+      const res: any = await editProjectById(activeProject?._id,editProjectFormData)
+      if (res?.status) {
+        setEditProjectStatus("edit-success")
+        triggerRerender()
         setEditProjectFormData(emptyState)
-      })
+      } else {
+        setEditProjectStatus("edit-failure")
+      }
       // setAddNewTaskFormData(emptyState);
     } else {
       // Display error message

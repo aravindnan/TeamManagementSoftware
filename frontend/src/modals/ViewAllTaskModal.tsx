@@ -16,7 +16,7 @@ function ViewAllTaskModal(props: any) {
   const [priority, setPriority] = useState<PriorityFilter>("all");
   const [sort, setSort] = useState<SortMode>("default");
 
-  const allTasks: any[] = activeProject?.allTasks || [];
+  const allTasks: any[] = useMemo(() => activeProject?.allTasks || [], [activeProject?.allTasks]);
   const visible = useMemo(
     () => filterAndSortTasks(allTasks, { search: searchKey, status, priority, sort }),
     [allTasks, searchKey, status, priority, sort]

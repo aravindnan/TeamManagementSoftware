@@ -83,15 +83,14 @@ function AddNewTaskModal(props: any) {
     if (validateBeforeSubmit()) {
       // Perform registration logic here call API
       setCreateTaskStatus("create-loading")
-      await addTaskToProject(activeProject._id,addNewTaskFormData).then((res:any)=>{
+      const res: any = await addTaskToProject(activeProject._id,addNewTaskFormData)
+      if (res?.status) {
         setCreateTaskStatus("create-success")
         setCreatedTaskId(res.taskId)
         triggerRerender()
-
-      }).catch((err:any)=>{
-        console.error(err)
-        setCreateTaskStatus("create-failure");
-      })
+      } else {
+        setCreateTaskStatus("create-failure")
+      }
 
       // setAddNewTaskFormData(emptyState);
     } else {

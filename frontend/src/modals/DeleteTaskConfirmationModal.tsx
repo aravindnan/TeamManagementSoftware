@@ -14,13 +14,8 @@ function DeleteTaskConfirmationModal(props:any) {
     const handleDelete =async()=>{
       setDeleteTaskStatus("delete-loading")
 
-      await deleteTaskById(activeTask?._id).then((res:any)=>{
-        if(res?.deleteStatus){
-          setDeleteTaskStatus("delete-success")
-        }
-      }).catch((err:any)=>{
-        setDeleteTaskStatus("delete-failure")
-      })
+      const res: any = await deleteTaskById(activeTask?._id)
+      setDeleteTaskStatus(res?.deleteStatus ? "delete-success" : "delete-failure")
       
     }
 

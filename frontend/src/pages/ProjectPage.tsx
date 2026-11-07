@@ -1,4 +1,4 @@
-import React, { useEffect, useState ,useRef} from "react";
+import React, { useEffect, useState } from "react";
 import ProjectPageProjectInfo from "../components/ProjectPageProjectInfo";
 import ProjectPageMyTasks from "../components/ProjectPageMyTasks";
 import ProjectPageProjectMembers from "../components/ProjectPageProjectMembers";
@@ -29,13 +29,11 @@ import APIResponseStatus from "../common/APIResponseStatus";
 
 
 function ProjectPage() {
-  const commentsContainerRef = useRef<HTMLDivElement>(null);
   const [addTaskModal,setAddTaskModal]=useState<Boolean>(false)
   const [viewAllTaskModal,setViewAllTaskModal] = useState<Boolean>(false)
   const [boardModal,setBoardModal] = useState<Boolean>(false)
   const [activityModal,setActivityModal] = useState<Boolean>(false)
   const [userProfileModal,setUserProfileModal]=useState<Boolean>(false)
-  const [overallPerformaceModal,setOverallPerformanceModal]=useState<Boolean>(false)
   const [removeMemberModal,setRemoveMemberModal] = useState<any>({isOpen: false, memberData: null})
   const [viewMemberModal,setViewMemberModal] = useState<any>({isOpen: false, memberData: null})
   const [viewMediaModal,setViewMediaModal]=useState<any>({isOpen: false, mediaData: null})
@@ -46,7 +44,6 @@ function ProjectPage() {
   const [activeProject,setActiveProject] =  useState<any>({})
   const [rerender, setRerender] = useState(false);
   const [myTasks,setMytasks] = useState<any>([])
-  const [pendingTasks,setPendingTasks] = useState<any>([])
   const [completedTasks,setCompletedTasks] = useState<any>([])
   const [networkError,setNetworkError] = useState<Boolean>(false)
   const [pageLoading, setPageLoading] = useState<any>("not-loaded")
@@ -70,16 +67,25 @@ function ProjectPage() {
   
 
   useEffect(() => {
-    const queryString = window.location.search;
-    let urlParams = new URLSearchParams(queryString);
-    const projectId = urlParams.get("id");
-    if (projectId) {
-      getProjectData(projectId)
-    }
-    else{
+    const projectId = new URLSearchParams(window.location.search).get("id");
+    if (!projectId) {
       navigate("/not-found", { replace: true })
+      return
     }
-  }, [rerender]);
+    let cancelled = false
+    ;(async () => {
+      const res: any = await getProjectById(projectId)
+      if (cancelled) return
+      if (res?._id) {
+        setPageLoading("loaded")
+        setActiveProject(res)
+      } else {
+        setNetworkError(res?.code === "ERR_NETWORK")
+        setPageLoading("error")
+      }
+    })()
+    return () => { cancelled = true }
+  }, [rerender, navigate]);
 
 
 
@@ -88,25 +94,12 @@ function ProjectPage() {
     setRerender((prev) => !prev);
   };
 
-  const getProjectData = async (projectId: string) => {
-    const res: any = await getProjectById(projectId)
-    if (res?._id) {
-      setPageLoading("loaded")
-      setActiveProject(res)
-    } else {
-      setNetworkError(res?.code === "ERR_NETWORK")
-      setPageLoading("error")
-    }
-  }
-
   useEffect(()=>{
     if (activeProject?.allTasks) {
       const tasks = activeProject.allTasks;
 
-      const pending = tasks.filter((task: any) => task.taskStatus !== 'Completed');
       const completed = tasks.filter((task: any) => task.taskStatus === 'Completed');
 
-      setPendingTasks(pending);
       setCompletedTasks(completed);
     }
 
@@ -120,19 +113,20 @@ function ProjectPage() {
   // );
 const dispatch = useDispatch()
 useEffect(() => {
-  getMyProfileData()
-}, []);
-
-const getMyProfileData = async () => {
-  const res: any = await getMe()
-  if (res === null) {
-    navigate("/login")
-  } else if (res?._id) {
-    dispatch(authActions.loginAction(res))
-  } else {
-    setNetworkError(res?.code === "ERR_NETWORK")
-  }
-}
+  let cancelled = false
+  ;(async () => {
+    const res: any = await getMe()
+    if (cancelled) return
+    if (res === null) {
+      navigate("/login")
+    } else if (res?._id) {
+      dispatch(authActions.loginAction(res))
+    } else {
+      setNetworkError(res?.code === "ERR_NETWORK")
+    }
+  })()
+  return () => { cancelled = true }
+}, [navigate, dispatch]);
 
   return (
     <>{
@@ -155,7 +149,6 @@ const getMyProfileData = async () => {
         setViewAllTaskModal = {setViewAllTaskModal} 
         setBoardModal={setBoardModal}
         setActivityModal={setActivityModal}
-        setOverallPerformanceModal={setOverallPerformanceModal}
         setEditProjectInfoModal={setEditProjectInfoModal}
         setViewMemberModal={setViewMemberModal}
         setDeleteProjetModal={setDeleteProjetModal}

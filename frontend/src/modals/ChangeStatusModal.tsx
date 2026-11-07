@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import ModalOverlay from '../common/ModalOverlay';
 import APIResponseStatus from '../common/APIResponseStatus'
 import { Close } from '@mui/icons-material'
@@ -7,29 +7,19 @@ import { changeTaskStatus } from '../services/taskServices'
 function ChangeStatusModal(props:any) {
     const {setTaskStatusModal,activeTask,triggerRerender}=props
     const[updateTaskStatus,setUpdateTaskStatus]=useState<string>("not-updated")
-    const[currentStatus,setCurrentStatus] = useState<string>(activeTask?.taskStatus)
-
-    useEffect(()=>{
-        if(currentStatus==="Completed"){
-            setCurrentStatus("In Progress")
-        }
-        else{
-            setCurrentStatus("Completed")
-        }
-
-    },[activeTask])
+    // Completed tasks are reopened; anything still open is completed.
+    const targetStatus = activeTask?.taskStatus === "Completed" ? "In Progress" : "Completed"
 
 
     const handleUpdate =async()=>{
       setUpdateTaskStatus("update-loading")
-      await changeTaskStatus(activeTask?._id,currentStatus).then((res:any)=>{
-        if(res?.updateStatus){
-          setUpdateTaskStatus("update-success")
-          triggerRerender()
-        }
-      }).catch((err:any)=>{
+      const res: any = await changeTaskStatus(activeTask?._id,targetStatus)
+      if (res?.updateStatus) {
+        setUpdateTaskStatus("update-success")
+        triggerRerender()
+      } else {
         setUpdateTaskStatus("update-failure")
-      })
+      }
       
     }
 

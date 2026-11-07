@@ -25,7 +25,6 @@ import APIResponseStatus from "../common/APIResponseStatus";
   function Dashboard() {
     document.title = "TMS • Dashboard";
     const [createNewProjectModal, setCreateNewProjectModal] =useState<Boolean>(false);
-    const [overallPerformaceModal, setOverallPerformanceModal] =useState<Boolean>(false);
     const [userProfileModal, setUserProfileModal] = useState<Boolean>(false);
     const [logoutModal, setLogoutModal] = useState<Boolean>(false);
     const [rerender, setRerender] = useState(false);
@@ -41,21 +40,22 @@ import APIResponseStatus from "../common/APIResponseStatus";
     const dispatch = useDispatch()
     const navigate = useNavigate()
     useEffect(() => {
-      getMyProfileData()
-    }, [rerender]);
-    
-    const getMyProfileData = async () => {
-      const res: any = await getMe()
-      if (res === null) {
-        navigate("/login")
-      } else if (res?._id) {
-        setPageLoading("loaded")
-        dispatch(authActions.loginAction(res))
-      } else {
-        setNetworkError(res?.code === "ERR_NETWORK")
-        setPageLoading("error")
-      }
-    }
+      let cancelled = false
+      ;(async () => {
+        const res: any = await getMe()
+        if (cancelled) return
+        if (res === null) {
+          navigate("/login")
+        } else if (res?._id) {
+          setPageLoading("loaded")
+          dispatch(authActions.loginAction(res))
+        } else {
+          setNetworkError(res?.code === "ERR_NETWORK")
+          setPageLoading("error")
+        }
+      })()
+      return () => { cancelled = true }
+    }, [rerender, navigate, dispatch]);
 
   useEffect(()=>{
     if (myProfiledata?.allTasks) {
@@ -101,7 +101,6 @@ import APIResponseStatus from "../common/APIResponseStatus";
                     color={colors.C11}
                     trackColor={colors.C44}
                     percentage={Math.floor((completedTasks?.length/myProfiledata?.allTasks?.length)*100)}
-                    setOverallPerformanceModal={setOverallPerformanceModal}
                   />:null
                   }
 
