@@ -5,6 +5,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const { notFound, forbidden, conflict } = require("../utils/AppError");
 const { PUBLIC_USER_FIELDS } = require("../utils/access");
 const { deleteTasksCascade } = require("../utils/cascade");
+const { logActivity } = require("../utils/activity");
 
 const getFullProfile = (userId) =>
   User.findById(userId).populate("myProjects").populate("involvedProjects").populate("allTasks");
@@ -65,6 +66,7 @@ exports.create_new_project_for_user_id = asyncHandler(async (req, res) => {
     projectMembers: [req.user.id],
   });
   await User.updateOne({ _id: req.user.id }, { $addToSet: { myProjects: project._id } });
+  await logActivity(req.user.id, project._id, "project.created", { data: { name: projectName } });
   res.status(201).json({ message: "Project created successfully", project });
 });
 

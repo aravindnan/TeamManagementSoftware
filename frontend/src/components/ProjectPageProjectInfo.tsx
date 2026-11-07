@@ -3,6 +3,7 @@ import {
   CalendarMonth,
   CheckBox,
   ViewKanban,
+  History,
   Delete,
   DonutLarge,
   Edit,
@@ -23,6 +24,7 @@ function ProjectPageProjectInfo(props: any) {
     activeProject, 
     setViewAllTaskModal, 
     setBoardModal,
+    setActivityModal,
     setOverallPerformanceModal ,
     setEditProjectInfoModal,
     setViewMemberModal,
@@ -92,6 +94,21 @@ function ProjectPageProjectInfo(props: any) {
                 >
                   <ViewKanban sx={{ fontSize: 12, color: colors.C11 }} />
                   <div className="p-2 font-semibold">Kanban</div>
+                </button>
+              </Tooltip>
+            </div>
+
+            <div className="flex flex-col">
+              <div className=" text-C11 text-[8px] font-bold  w-fit py-1 select-none">
+                Activity
+              </div>
+              <Tooltip title={"Project Activity Feed"} arrow placement="bottom">
+                <button
+                  onClick={() => setActivityModal(true)}
+                  className="flex flex-row items-center px-2 rounded-[4px] text-[12px] cursor-pointer bg-C44 "
+                >
+                  <History sx={{ fontSize: 12, color: colors.C11 }} />
+                  <div className="p-2 font-semibold">Feed</div>
                 </button>
               </Tooltip>
             </div>

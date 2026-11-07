@@ -29,3 +29,8 @@ export const deleteMediaFromProject = (projectId: string, mediaURL: string) =>
   call(api.delete(`/remove-media-from-project/${projectId}`, { data: { mediaURL } }));
 
 export const getProjectRisk = (projectId: string) => call(api.get(`/get-project-risk-by-id/${projectId}`));
+
+export type ActivityCategory = "project" | "task" | "comment" | "file" | "member";
+
+export const getProjectActivity = (projectId: string, params: { before?: string; category?: ActivityCategory; limit?: number } = {}) =>
+  call(api.get(`/get-project-activity-by-id/${projectId}`, { params }));

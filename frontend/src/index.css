@@ -2,8 +2,14 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* The design is a light UI: pin it so pages that never set a background (project, task) look the same
+   regardless of the browser's dark-mode preference. #FAFAFA is the existing "C55" off-white. */
+html {
+  color-scheme: light;
+}
 body {
   margin: 0;
+  background-color: #FAFAFA;
   font-family: 'Inter', sans-serif !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

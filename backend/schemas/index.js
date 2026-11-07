@@ -78,6 +78,13 @@ const editTask = z.object({
 });
 const changeStatus = z.object({ newStatus: z.enum(TASK_STATUSES) });
 
+// ---- activity feed
+const activityQuery = z.object({
+  before: objectId.optional(),
+  category: z.enum(["project", "task", "comment", "file", "member"]).optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional().default(20),
+});
+
 // ---- shared
 const comment = z.object({ messageContent: trimmed(1, 2000, "Comment") });
 const addMedia = z.object({ mediaDataArray: z.array(mediaItem).min(1).max(20) });
@@ -86,5 +93,5 @@ const removeMedia = z.object({ mediaURL: z.string().url().max(2048) });
 module.exports = {
   idParam, register, login, updateProfile, userSearch,
   createProject, editProject, memberBody, addTask,
-  editTask, changeStatus, comment, addMedia, removeMedia,
+  editTask, changeStatus, comment, addMedia, removeMedia, activityQuery,
 };

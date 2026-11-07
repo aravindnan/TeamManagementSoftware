@@ -254,6 +254,107 @@ describe("projects & tasks", () => {
   });
 });
 
+describe("activity feed", () => {
+  async function scene() {
+    const m = await signup(1), t = await signup(2), outsider = await signup(3);
+    const projectId = (await m.a.post(`/create-new-project-for-user-id/${m.id}`).send({ projectName: "Proj" })).body.project._id;
+    await m.a.post(`/add-new-member-by-project-id/${projectId}`).send({ memberId: t.id });
+    const task = await m.a.post(`/add-new-task-by-project-id/${projectId}`).send({ taskTitle: "Ship it", taskPriority: "Low", dueDate: "2030-01-01", assignedTo: t.id });
+    return { m, t, outsider, projectId, taskId: task.body.taskId };
+  }
+  const feed = async (a, projectId, qs = "") => (await a.get(`/get-project-activity-by-id/${projectId}${qs}`).expect(200)).body;
+
+  test("records the full lifecycle, newest first, with readable snapshots", async () => {
+    const { m, t, projectId, taskId } = await scene();
+    await t.a.put(`/change-task-status-by-id/${taskId}`).send({ newStatus: "In Review" }).expect(200);
+    await t.a.put(`/change-task-status-by-id/${taskId}`).send({ newStatus: "In Review" }).expect(200); // no-op: must not log
+    await m.a.put(`/edit-task-by-id/${taskId}`).send({ taskTitle: "Ship it now", taskDescription: "", taskPriority: "High", taskStatus: "In Review", dueDate: "2030-01-01" }).expect(200);
+    await t.a.post(`/add-comment-to-task-by-id/${taskId}`).send({ messageContent: "on it" }).expect(200);
+    await t.a.post(`/add-comment-to-project-by-id/${projectId}`).send({ messageContent: "hello team" }).expect(200);
+    await t.a.post(`/add-media-to-task/${taskId}`).send({ mediaDataArray: [{ mediaURL: "https://x.test/a.png", mediaName: "a.png" }] }).expect(200);
+    await m.a.put(`/edit-project-by-id/${projectId}`).send({ projectName: "Proj 2", projectDescription: "", projectStatus: "In Progress" }).expect(200);
+    await m.a.delete(`/delete-task-by-id/${taskId}`).expect(200);
+
+    const { items, nextCursor } = await feed(m.a, projectId, "?limit=50");
+    expect(nextCursor).toBeNull();
+    expect(items.map((i) => i.verb)).toEqual([
+      "task.deleted", "project.updated", "media.added", "comment.project", "comment.task",
+      "task.updated", "task.status_changed", "task.created", "member.added", "project.created",
+    ]);
+    const byVerb = Object.fromEntries(items.map((i) => [i.verb, i]));
+    expect(byVerb["task.status_changed"].data).toEqual({ title: "Ship it", from: "To Do", to: "In Review" });
+    expect(byVerb["task.status_changed"].actorName).toBe("First2 Last2");
+    expect(byVerb["task.updated"].data.changes).toEqual([
+      { field: "title", from: "Ship it", to: "Ship it now" },
+      { field: "priority", from: "Low", to: "High" },
+    ]);
+    expect(byVerb["task.created"].data).toMatchObject({ title: "Ship it", assigneeName: "First2 Last2" });
+    expect(byVerb["member.added"].data.memberName).toBe("First2 Last2");
+    expect(byVerb["project.updated"].data.changes).toEqual([{ field: "name", from: "Proj", to: "Proj 2" }]);
+    expect(byVerb["comment.task"].data.excerpt).toBe("on it");
+    expect(byVerb["media.added"].data.names).toEqual(["a.png"]);
+    // the deleted task is still described by its snapshot
+    expect(byVerb["task.deleted"].data.title).toBe("Ship it now");
+  });
+
+  test("members only", async () => {
+    const { outsider, projectId } = await scene();
+    await outsider.a.get(`/get-project-activity-by-id/${projectId}`).expect(403);
+  });
+
+  test("cursor pagination returns every entry exactly once", async () => {
+    const { m, projectId } = await scene();
+    for (let i = 0; i < 5; i++) await m.a.post(`/add-comment-to-project-by-id/${projectId}`).send({ messageContent: `c${i}` });
+    const all = (await feed(m.a, projectId, "?limit=50")).items.map((i) => i._id);
+    const seen = [];
+    let cursor = null;
+    let pages = 0;
+    do {
+      const page = await feed(m.a, projectId, `?limit=3${cursor ? `&before=${cursor}` : ""}`);
+      seen.push(...page.items.map((i) => i._id));
+      cursor = page.nextCursor;
+      pages++;
+    } while (cursor);
+    expect(seen).toEqual(all);
+    expect(pages).toBe(Math.ceil(all.length / 3));
+  });
+
+  test("filters by category and validates query params", async () => {
+    const { m, projectId } = await scene();
+    await m.a.post(`/add-comment-to-project-by-id/${projectId}`).send({ messageContent: "hi" });
+    const comments = await feed(m.a, projectId, "?category=comment");
+    expect(comments.items).toHaveLength(1);
+    expect(comments.items[0].verb).toBe("comment.project");
+    await m.a.get(`/get-project-activity-by-id/${projectId}?limit=0`).expect(400);
+    await m.a.get(`/get-project-activity-by-id/${projectId}?limit=500`).expect(400);
+    await m.a.get(`/get-project-activity-by-id/${projectId}?before=nope`).expect(400);
+    await m.a.get(`/get-project-activity-by-id/${projectId}?category=weird`).expect(400);
+  });
+
+  test("removing a member logs how many tasks were handed over", async () => {
+    const { m, t, projectId } = await scene();
+    await m.a.delete(`/remove-member-from-project-by-id/${projectId}`).send({ memberId: t.id }).expect(200);
+    const { items } = await feed(m.a, projectId);
+    expect(items[0]).toMatchObject({ verb: "member.removed", data: { memberName: "First2 Last2", reassigned: 1 } });
+  });
+
+  test("a failure to record activity never breaks the action", async () => {
+    const { t, projectId, taskId } = await scene();
+    const Activity = mongoose.model("Activity");
+    const spy = jest.spyOn(Activity, "create").mockRejectedValueOnce(new Error("db hiccup"));
+    await t.a.put(`/change-task-status-by-id/${taskId}`).send({ newStatus: "Completed" }).expect(200);
+    spy.mockRestore();
+    expect((await t.a.get(`/get-task-by-id/${taskId}`)).body.taskStatus).toBe("Completed");
+  });
+
+  test("deleting a project deletes its feed", async () => {
+    const { m, projectId } = await scene();
+    expect(await mongoose.model("Activity").countDocuments({ project: projectId })).toBeGreaterThan(0);
+    await m.a.delete(`/delete-project-by-id/${projectId}`).expect(200);
+    expect(await mongoose.model("Activity").countDocuments({ project: projectId })).toBe(0);
+  });
+});
+
 describe("uploads", () => {
   test("sign endpoint requires auth and returns a valid scoped signature without leaking the secret", async () => {
     await request(app).post("/uploads/sign").expect(401);
