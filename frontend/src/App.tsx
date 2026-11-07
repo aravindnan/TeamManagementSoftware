@@ -4,6 +4,7 @@ import "aos/dist/aos.css";
 import AOS from "aos";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import ErrorBoundary from "./common/ErrorBoundary";
+import NotificationPoller from "./components/NotificationPoller";
 import HomePage from "./pages/HomePage";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -25,6 +26,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <NotificationPoller />
       <ErrorBoundary>
         <Suspense fallback={<PageFallback />}>
           <Routes>

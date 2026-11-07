@@ -2,6 +2,7 @@ import { Logout } from '@mui/icons-material'
 import React, {} from 'react'
 import { useSelector } from 'react-redux';
 import Logo from '../common/Logo';
+import NotificationBell from './NotificationBell';
 import { Link } from 'react-router-dom';
 import { colors } from '../Constants';
 
@@ -33,15 +34,19 @@ const myProfiledata = useSelector(
         </div>
       </Link> 
       
-      {
-      activePage==="dashboard"?
-      <button className="flex justify-center py-4 cursor-pointer"
-      onClick={()=>setLogoutModal(true)}
-      >
-        <Logout sx={{ fontSize: 20, color: colors.C11 }} />
-      </button>
-    :null
-    }
+      <div className="flex flex-row items-center gap-4">
+        <NotificationBell />
+        {
+        activePage==="dashboard"?
+        <button className="flex justify-center py-4 cursor-pointer"
+        onClick={()=>setLogoutModal(true)}
+        aria-label="Log out"
+        >
+          <Logout sx={{ fontSize: 20, color: colors.C11 }} />
+        </button>
+      :null
+      }
+      </div>
     </div>
   )
 }

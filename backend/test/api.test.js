@@ -355,6 +355,103 @@ describe("activity feed", () => {
   });
 });
 
+describe("notifications", () => {
+  async function scene() {
+    const m = await signup(1), t = await signup(2), b = await signup(4);
+    const projectId = (await m.a.post(`/create-new-project-for-user-id/${m.id}`).send({ projectName: "Proj" })).body.project._id;
+    await m.a.post(`/add-new-member-by-project-id/${projectId}`).send({ memberId: t.id });
+    await m.a.post(`/add-new-member-by-project-id/${projectId}`).send({ memberId: b.id });
+    const task = await m.a.post(`/add-new-task-by-project-id/${projectId}`).send({ taskTitle: "Ship it", taskPriority: "High", dueDate: "2030-01-01", assignedTo: t.id });
+    return { m, t, b, projectId, taskId: task.body.taskId };
+  }
+  const inbox = async (u, qs = "") => (await u.a.get(`/notifications${qs}`).expect(200)).body;
+  const types = async (u) => (await inbox(u)).items.map((n) => n.type);
+
+  test("assigning a task notifies the assignee, never the actor or bystanders", async () => {
+    const { m, t, b } = await scene();
+    expect(await types(m)).toEqual([]);
+    expect(await types(b)).toEqual(["member.added"]); // only for being added
+    const mine = (await inbox(t)).items;
+    expect(mine.map((n) => n.type)).toEqual(["task.created", "member.added"]);
+    expect(mine[0]).toMatchObject({ actorName: "First1 Last1", projectName: "Proj", data: { title: "Ship it" } });
+  });
+
+  test("status changes and comments notify the other party on the task, not the person who acted", async () => {
+    const { m, t, b, taskId } = await scene();
+    await t.a.put(`/change-task-status-by-id/${taskId}`).send({ newStatus: "In Review" }).expect(200);
+    expect(await types(m)).toEqual(["task.status_changed"]); // creator is told
+    expect((await types(t)).includes("task.status_changed")).toBe(false); // actor is not
+    await m.a.post(`/add-comment-to-task-by-id/${taskId}`).send({ messageContent: "looks good" }).expect(200);
+    await t.a.post(`/add-comment-to-task-by-id/${taskId}`).send({ messageContent: "thanks" }).expect(200);
+    expect((await types(t))[0]).toBe("comment.task");
+    expect((await types(m))[0]).toBe("comment.task");
+    expect((await types(b)).filter((x) => x !== "member.added")).toEqual([]); // bystander hears nothing
+  });
+
+  test("assigning a task to yourself is silent", async () => {
+    const { m, projectId } = await scene();
+    await m.a.post(`/add-new-task-by-project-id/${projectId}`).send({ taskTitle: "Mine", assignedTo: m.id }).expect(201);
+    expect(await types(m)).toEqual([]);
+  });
+
+  test("being removed from a project, and a task being deleted, notify the affected person", async () => {
+    const { m, t, b, projectId, taskId } = await scene();
+    await m.a.delete(`/delete-task-by-id/${taskId}`).expect(200);
+    expect((await types(t))[0]).toBe("task.deleted");
+    await m.a.delete(`/remove-member-from-project-by-id/${projectId}`).send({ memberId: b.id }).expect(200);
+    expect((await types(b))[0]).toBe("member.removed");
+  });
+
+  test("unread count, mark read, mark all read and the unread filter", async () => {
+    const { t } = await scene();
+    expect((await t.a.get("/notifications/unread-count").expect(200)).body.count).toBe(2);
+    const { items, unreadCount } = await inbox(t);
+    expect(unreadCount).toBe(2);
+    await t.a.post(`/notifications/${items[0]._id}/read`).expect(200);
+    expect((await t.a.get("/notifications/unread-count")).body.count).toBe(1);
+    await t.a.post(`/notifications/${items[0]._id}/read`).expect(200); // idempotent
+    const unread = await inbox(t, "?unread=true");
+    expect(unread.items.map((n) => n._id)).toEqual([items[1]._id]);
+    const all = await t.a.post("/notifications/read-all").expect(200);
+    expect(all.body.updated).toBe(1);
+    expect((await t.a.get("/notifications/unread-count")).body.count).toBe(0);
+    expect((await inbox(t)).items).toHaveLength(2); // read items stay in the inbox
+  });
+
+  test("cursor pagination returns every notification once", async () => {
+    const { m, t, projectId } = await scene();
+    for (let i = 0; i < 4; i++) await m.a.post(`/add-new-task-by-project-id/${projectId}`).send({ taskTitle: `T${i}`, assignedTo: t.id });
+    const all = (await inbox(t, "?limit=50")).items.map((n) => n._id);
+    const seen = [];
+    let cursor = null;
+    do {
+      const page = await inbox(t, `?limit=4${cursor ? `&before=${cursor}` : ""}`);
+      seen.push(...page.items.map((n) => n._id));
+      cursor = page.nextCursor;
+    } while (cursor);
+    expect(seen).toEqual(all);
+    expect(all.length).toBe(6);
+  });
+
+  test("inboxes are private: no cross-user reads, and auth is required", async () => {
+    const { m, t } = await scene();
+    const theirs = (await inbox(t)).items[0];
+    await m.a.post(`/notifications/${theirs._id}/read`).expect(404);
+    expect((await t.a.get("/notifications/unread-count")).body.count).toBe(2); // untouched
+    await request(app).get("/notifications").expect(401);
+    await request(app).get("/notifications/unread-count").expect(401);
+    await m.a.post("/notifications/not-an-id/read").expect(400);
+    await m.a.get("/notifications?limit=0").expect(400);
+  });
+
+  test("deleting a project removes its notifications", async () => {
+    const { m, t, projectId } = await scene();
+    expect((await inbox(t)).items.length).toBeGreaterThan(0);
+    await m.a.delete(`/delete-project-by-id/${projectId}`).expect(200);
+    expect((await inbox(t)).items).toEqual([]);
+  });
+});
+
 describe("uploads", () => {
   test("sign endpoint requires auth and returns a valid scoped signature without leaking the secret", async () => {
     await request(app).post("/uploads/sign").expect(401);

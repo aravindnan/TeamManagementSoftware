@@ -6,6 +6,7 @@ const { notFound, forbidden, conflict } = require("../utils/AppError");
 const { PUBLIC_USER_FIELDS } = require("../utils/access");
 const { deleteTasksCascade } = require("../utils/cascade");
 const { logActivity } = require("../utils/activity");
+const Notification = require("../model/notification");
 
 const getFullProfile = (userId) =>
   User.findById(userId).populate("myProjects").populate("involvedProjects").populate("allTasks");
@@ -92,6 +93,7 @@ exports.delete_user_by_user_id = asyncHandler(async (req, res) => {
   await Project.updateMany({ projectMembers: req.user.id }, { $pull: { projectMembers: req.user.id } });
   await Project.updateMany({ allTasks: { $in: tasks.map((t) => t._id) } }, { $pullAll: { allTasks: tasks.map((t) => t._id) } });
   await deleteTasksCascade(tasks.map((t) => t._id));
+  await Notification.deleteMany({ user: req.user.id });
   await User.deleteOne({ _id: req.user.id });
   res.clearCookie(require("../config/env").cookieName);
   res.status(200).json({ message: "User deleted successfully" });

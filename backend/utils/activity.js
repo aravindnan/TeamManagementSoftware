@@ -1,5 +1,7 @@
 const Activity = require("../model/activity");
 const User = require("../model/user");
+const Project = require("../model/project");
+const Notification = require("../model/notification");
 const { isTest } = require("../config/env");
 
 const CATEGORY = {
@@ -20,22 +22,36 @@ const CATEGORY = {
 const fullName = (u) => (u ? `${u.firstName || ""} ${u.lastName || ""}`.trim() : "") || "Someone";
 const excerpt = (text, n = 90) => (text.length > n ? `${text.slice(0, n - 1).trimEnd()}…` : text);
 
+/** Distinct recipient ids, never including the person who caused the event. */
+const recipientsExcluding = (actorId, ids = []) =>
+  [...new Set(ids.filter(Boolean).map((id) => String(id && id._id ? id._id : id)))].filter((id) => id !== String(actorId));
+
 /**
- * Records an activity entry. Never throws: the feed is secondary to the action that triggered it,
- * so a logging failure must not turn a successful change into an error response.
+ * Records an activity entry and, when `notify` lists users, one notification per recipient.
+ * Never throws: both are secondary to the action that triggered them, so a failure here must not
+ * turn a successful change into an error response.
  */
-async function logActivity(actorId, projectId, verb, { task, data = {} } = {}) {
+async function logActivity(actorId, projectId, verb, { task, data = {}, notify = [] } = {}) {
   try {
     const actor = await User.findById(actorId).select("firstName lastName").lean();
+    const actorName = fullName(actor);
     await Activity.create({
       project: projectId,
       actor: actorId,
-      actorName: fullName(actor),
+      actorName,
       verb,
       category: CATEGORY[verb],
       task,
       data,
     });
+
+    const recipients = recipientsExcluding(actorId, notify);
+    if (recipients.length) {
+      const project = await Project.findById(projectId).select("projectName").lean();
+      await Notification.insertMany(
+        recipients.map((user) => ({ user, type: verb, actorName, project: projectId, projectName: project?.projectName, task, data }))
+      );
+    }
   } catch (err) {
     if (!isTest) console.error(`Could not record activity "${verb}":`, err.message);
   }
@@ -50,6 +66,7 @@ async function logTaskEdit(actorId, task, before) {
     await logActivity(actorId, task.project, "task.status_changed", {
       task: task._id,
       data: { title, from: before.taskStatus, to: task.taskStatus },
+      notify: [task.assignedTo, task.assignedBy],
     });
   }
   const changes = [];
@@ -57,7 +74,13 @@ async function logTaskEdit(actorId, task, before) {
     if (!sameValue(before[field], task[field])) changes.push({ field: label, from: before[field] ?? null, to: task[field] ?? null });
   }
   if (!sameValue(before.taskDescription, task.taskDescription)) changes.push({ field: "description" });
-  if (changes.length) await logActivity(actorId, task.project, "task.updated", { task: task._id, data: { title, changes } });
+  if (changes.length) {
+    await logActivity(actorId, task.project, "task.updated", {
+      task: task._id,
+      data: { title, changes },
+      notify: [task.assignedTo, task.assignedBy],
+    });
+  }
 }
 
 module.exports = { logActivity, logTaskEdit, fullName, excerpt, CATEGORY };

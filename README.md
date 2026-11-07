@@ -12,6 +12,7 @@ Collaborative task management: projects, members, tasks with priorities and due 
 - **Kanban board** (To Do / In Progress / In Review / Completed) with drag and drop and a keyboard-friendly status menu
 - **Deadline risk radar**: explainable per-task risk scores. Each flagged task lists the exact reasons (overdue, too little time for the remaining work given how long this project's finished tasks usually take, no recent activity, overloaded assignee), and the board shows risk chips on cards. Logic lives in `backend/utils/risk.js`.
 - **Activity feed**: an append-only log of what happened in each project (task created/moved/edited/deleted, comments, files, members, project edits) with field-level changes, category filters and cursor pagination. Entries snapshot names and titles so they stay readable after the thing they describe is deleted. Logging can never fail the action that triggered it. See `backend/utils/activity.js`.
+- **Notifications and Inbox**: assignees, task creators and affected members are notified (never the person who acted). Bell with unread badge in both nav bars, an inbox modal with read/unread, mark-all-read, pagination and click-through to the task. One shared 30 s poller (paused when the tab is hidden). Inboxes are strictly per-user. See `backend/utils/activity.js` for the recipient rules.
 
 ## Run locally
 

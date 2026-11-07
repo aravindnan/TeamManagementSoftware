@@ -8,6 +8,7 @@ const { PUBLIC_USER_FIELDS, idEq, isManager, isMember, loadProject, requireMembe
 const { deleteTasksCascade } = require("../utils/cascade");
 const { assessProject } = require("../utils/risk");
 const Activity = require("../model/activity");
+const Notification = require("../model/notification");
 const { logActivity, fullName, excerpt } = require("../utils/activity");
 
 // ----- GET -----
@@ -98,6 +99,7 @@ exports.add_new_task_to_project_by_id = asyncHandler(async (req, res) => {
   await logActivity(req.user.id, project._id, "task.created", {
     task: task._id,
     data: { title: taskTitle, priority: taskPriority, dueDate, assigneeName: fullName(assignee) },
+    notify: [assignedTo],
   });
   res.status(201).json({ message: "New task added to the project successfully", taskId: task._id, status: true });
 });
@@ -115,7 +117,7 @@ exports.add_member_to_project_by_id = asyncHandler(async (req, res) => {
     Project.updateOne({ _id: project._id }, { $addToSet: { projectMembers: memberId } }),
     User.updateOne({ _id: memberId }, { $addToSet: { involvedProjects: project._id } }),
   ]);
-  await logActivity(req.user.id, project._id, "member.added", { data: { memberName: fullName(newMember) } });
+  await logActivity(req.user.id, project._id, "member.added", { data: { memberName: fullName(newMember) }, notify: [memberId] });
   res.status(200).json({ message: "Member added to the project successfully", project: await Project.findById(project._id) });
 });
 
@@ -179,7 +181,10 @@ exports.remove_member_from_project_by_id = asyncHandler(async (req, res) => {
     Project.updateOne({ _id: project._id }, { $pull: { projectMembers: memberId } }),
     User.updateOne({ _id: memberId }, { $pull: { involvedProjects: project._id }, $pullAll: { allTasks: orphanIds } }),
   ]);
-  await logActivity(req.user.id, project._id, "member.removed", { data: { memberName: fullName(leaver), reassigned: orphanIds.length } });
+  await logActivity(req.user.id, project._id, "member.removed", {
+    data: { memberName: fullName(leaver), reassigned: orphanIds.length },
+    notify: [memberId],
+  });
   res.status(200).json({ message: "Member removed from the project successfully", deleteStatus: true });
 });
 
@@ -193,6 +198,7 @@ exports.delete_project_by_id = asyncHandler(async (req, res) => {
     User.updateMany({ _id: { $in: project.projectMembers } }, { $pull: { involvedProjects: project._id } }),
     User.updateOne({ _id: project.projectManager }, { $pull: { myProjects: project._id } }),
     Activity.deleteMany({ project: project._id }),
+    Notification.deleteMany({ project: project._id }),
     Project.deleteOne({ _id: project._id }),
   ]);
   res.status(200).json({ message: "Project deleted successfully", deleteStatus: true });

@@ -2,6 +2,7 @@ import { Logout } from '@mui/icons-material'
 import { Tooltip } from '@mui/material'
 import React from 'react'
 import Logo from '../common/Logo'
+import NotificationBell from './NotificationBell'
 import { Link } from 'react-router-dom'
 import { colors } from '../Constants'
 import { useSelector } from 'react-redux'
@@ -37,6 +38,11 @@ function Sidebar(props:any) {
         </div>
       }
       </button>
+    </Tooltip>
+    <Tooltip title="Notifications" placement="right" arrow>
+      <div className="flex justify-center">
+        <NotificationBell />
+      </div>
     </Tooltip>
     </div>
     {

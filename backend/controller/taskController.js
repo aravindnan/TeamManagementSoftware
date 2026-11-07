@@ -55,7 +55,11 @@ exports.add_comment_by_task_id = asyncHandler(async (req, res) => {
     messageContent: req.body.messageContent,
   });
   await Task.updateOne({ _id: task._id }, { $push: { taskComments: comment._id } });
-  await logActivity(req.user.id, task.project, "comment.task", { task: task._id, data: { title: task.taskTitle, excerpt: excerpt(comment.messageContent) } });
+  await logActivity(req.user.id, task.project, "comment.task", {
+    task: task._id,
+    data: { title: task.taskTitle, excerpt: excerpt(comment.messageContent) },
+    notify: [task.assignedTo, task.assignedBy],
+  });
   res.status(200).json({ message: "Comment added successfully", comment, addStatus: true });
 });
 
@@ -67,7 +71,7 @@ exports.delete_task_by_id = asyncHandler(async (req, res) => {
   await Project.updateOne({ _id: task.project }, { $pull: { allTasks: task._id } });
   await Comment.deleteMany({ _id: { $in: task.taskComments } });
   await deleteTasksCascade([task._id]);
-  await logActivity(req.user.id, task.project, "task.deleted", { data: { title: task.taskTitle } });
+  await logActivity(req.user.id, task.project, "task.deleted", { data: { title: task.taskTitle }, notify: [task.assignedTo] });
   res.status(200).json({ message: "Task deleted successfully", deleteStatus: true });
 });
 

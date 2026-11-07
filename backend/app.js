@@ -36,6 +36,7 @@ function createApp() {
   app.use("/", require("./routes/project"));
   app.use("/", require("./routes/task"));
   app.use("/", require("./routes/upload"));
+  app.use("/", require("./routes/notification"));
 
   app.use(notFoundHandler);
   app.use(errorHandler);
