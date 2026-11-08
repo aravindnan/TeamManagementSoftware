@@ -1,27 +1,33 @@
 # One-command local stack:  cp .env.example .env  (set JWT_SECRET)  &&  docker compose up --build
+#   (set POSTGRES_PASSWORD too)
 #   web  -> http://localhost:8080
 #   api  -> http://localhost:8000/healthz
 services:
-  mongo:
-    image: mongo:7
+  postgres:
+    image: postgres:16-alpine
     restart: unless-stopped
+    environment:
+      POSTGRES_USER: tms
+      POSTGRES_DB: tms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
     volumes:
-      - mongo-data:/data/db
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U tms -d tms"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   api:
     build: ./backend
     restart: unless-stopped
     depends_on:
-      mongo:
+      postgres:
         condition: service_healthy
     environment:
       PORT: 8000
-      MONGO_URI: mongodb://mongo:27017/tms
+      # The API applies pending database migrations on start (see backend/Dockerfile).
+      DATABASE_URL: postgresql://tms:${POSTGRES_PASSWORD}@postgres:5432/tms?schema=public
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (see .env.example)}
       CLIENT_ORIGINS: http://localhost:8080
       # The compose stack is served over plain HTTP; drop this line when you put it behind HTTPS.
@@ -44,4 +50,4 @@ services:
       - "8080:80"
 
 volumes:
-  mongo-data:
+  postgres-data:

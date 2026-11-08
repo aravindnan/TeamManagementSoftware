@@ -19,6 +19,23 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tms
+          POSTGRES_PASSWORD: ci-only-throwaway
+          POSTGRES_DB: tms_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tms -d tms_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # The tests wipe this database; it only exists for the duration of the job.
+      TEST_DATABASE_URL: postgresql://tms:ci-only-throwaway@localhost:5432/tms_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,12 +43,10 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      # The tests run against an in-memory MongoDB; cache the downloaded binary between runs.
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/mongodb-binaries
-          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('backend/package-lock.json') }}
       - run: npm ci
+      # Fails if the committed migrations no longer match prisma/schema.prisma.
+      - name: Check migrations are in sync with the schema
+        run: npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "$TEST_DATABASE_URL" --exit-code
       - run: npm test
 
   frontend:
@@ -69,6 +84,7 @@ jobs:
         run: docker compose config --quiet
         env:
           JWT_SECRET: ci-only-placeholder-secret-not-used-at-runtime
+          POSTGRES_PASSWORD: ci-only-placeholder-not-used-at-runtime
       - name: Build API image
         run: docker build ./backend
       - name: Build web image
