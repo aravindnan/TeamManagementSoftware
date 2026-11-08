@@ -75,6 +75,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npx --yes vercel@39 pull --yes --environment=production --token "$VERCEL_TOKEN"
-      - run: npx --yes vercel@39 build --prod --token "$VERCEL_TOKEN"
-      - run: npx --yes vercel@39 deploy --prebuilt --prod --token "$VERCEL_TOKEN"
+      - run: npx --yes vercel@65 pull --yes --environment=production --token "$VERCEL_TOKEN"
+      - run: npx --yes vercel@65 build --prod --token "$VERCEL_TOKEN"
+      - run: npx --yes vercel@65 deploy --prebuilt --prod --token "$VERCEL_TOKEN"
