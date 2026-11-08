@@ -1,19 +1,10 @@
-const Task = require("../model/task");
-const User = require("../model/user");
-const Comment = require("../model/comment");
+const { prisma } = require("../db/prisma");
 
-// Deletes tasks together with their comments and every back-reference held by users.
-async function deleteTasksCascade(taskIds) {
+// Tasks own their comments, files and sub-tasks through foreign keys with ON DELETE CASCADE, so
+// deleting the task rows is all it takes. Kept as a function so callers can run it in a transaction.
+async function deleteTasksCascade(taskIds, db = prisma) {
   if (!taskIds || taskIds.length === 0) return;
-  const tasks = await Task.find({ _id: { $in: taskIds } }).select("assignedTo taskComments");
-  const commentIds = tasks.flatMap((t) => t.taskComments);
-  const assignees = [...new Set(tasks.map((t) => String(t.assignedTo)))];
-
-  await Promise.all([
-    Comment.deleteMany({ _id: { $in: commentIds } }),
-    User.updateMany({ _id: { $in: assignees } }, { $pullAll: { allTasks: taskIds } }),
-    Task.deleteMany({ _id: { $in: taskIds } }),
-  ]);
+  await db.task.deleteMany({ where: { id: { in: taskIds } } });
 }
 
 module.exports = { deleteTasksCascade };

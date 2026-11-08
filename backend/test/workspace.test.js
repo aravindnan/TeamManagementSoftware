@@ -1,8 +1,8 @@
 const request = require("supertest");
-const mongoose = require("mongoose");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { prisma, assertTestDatabase, resetDatabase } = require("./helpers/db");
+const { hashToken } = require("../utils/invites");
 
-let mongod, app, User, Invite, Workspace, Project, Task, Notification;
+let app;
 const config = require("../config/env");
 
 const agent = () => request.agent(app);
@@ -16,7 +16,7 @@ async function signup(n, { verified = false } = {}) {
   const a = agent();
   await a.post("/register").send(userBody(n)).expect(201);
   const res = await a.post("/login").send({ username: `user${n}`, password: "Passw0rd!x" }).expect(200);
-  if (verified) await User.updateOne({ _id: res.body.userId }, { emailVerified: true });
+  if (verified) await prisma.user.update({ where: { id: res.body.userId }, data: { emailVerified: true } });
   return { a, id: res.body.userId, email: `user${n}@example.com`, n };
 }
 const makeWorkspace = async (owner, name = "Acme") => (await owner.a.post("/workspaces").send({ name }).expect(201)).body._id;
@@ -25,26 +25,15 @@ const invite = (u, wsId, body) => u.a.post(`/workspaces/${wsId}/invites`).send(b
 const inboxTypes = async (u) => (await u.a.get("/notifications")).body.items.map((x) => x.type);
 
 beforeAll(async () => {
-  mongod = await MongoMemoryServer.create();
-  process.env.MONGO_URI = mongod.getUri();
+  assertTestDatabase();
   const { connectToDatabase } = require("../config/database");
-  await connectToDatabase(process.env.MONGO_URI);
+  await connectToDatabase();
   app = require("../app").createApp();
-  User = require("../model/user");
-  Invite = require("../model/invite");
-  Workspace = require("../model/workspace");
-  Project = require("../model/project");
-  Task = require("../model/task");
-  Notification = require("../model/notification");
 });
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongod.stop();
+  await prisma.$disconnect();
 });
-beforeEach(async () => {
-  await mongoose.connection.db.dropDatabase();
-  await Promise.all(Object.values(mongoose.models).map((m) => m.syncIndexes()));
-});
+beforeEach(resetDatabase);
 
 // A workspace with an owner, an admin and a plain member already inside.
 async function team() {
@@ -107,7 +96,7 @@ describe("workspaces", () => {
     await admin.a.patch(`/workspaces/${wsId}`).send({ name: "Renamed" }).expect(200);
     await member.a.patch(`/workspaces/${wsId}`).send({ name: "Hax" }).expect(403);
     await outsider.a.patch(`/workspaces/${wsId}`).send({ name: "Hax" }).expect(404);
-    expect((await Workspace.findById(wsId)).name).toBe("Renamed");
+    expect((await prisma.workspace.findUnique({ where: { id: wsId } })).name).toBe("Renamed");
   });
 
   test("only the owner can delete, and not while projects remain", async () => {
@@ -119,8 +108,8 @@ describe("workspaces", () => {
     await owner.a.delete(`/delete-project-by-id/${p.body.project._id}`).expect(200);
     await invite(owner, wsId, { email: "someone@example.com" }).expect(201);
     await owner.a.delete(`/workspaces/${wsId}`).expect(200);
-    expect(await Workspace.countDocuments()).toBe(0);
-    expect(await Invite.countDocuments()).toBe(0); // its invitations go with it
+    expect(await prisma.workspace.count()).toBe(0);
+    expect(await prisma.invite.count()).toBe(0); // its invitations go with it
   });
 });
 
@@ -190,10 +179,10 @@ describe("removing someone cleans up their work", () => {
     const task = (await owner.a.post(`/add-new-task-by-project-id/${projectId}`).send({ taskTitle: "T", assignedTo: member.id })).body.taskId;
     const res = await owner.a.delete(`/workspaces/${wsId}/members/${member.id}`).expect(200);
     expect(res.body.projectsAffected).toBe(1);
-    const project = await Project.findById(projectId);
-    expect(project.projectMembers.map(String)).not.toContain(member.id);
-    expect(String((await Task.findById(task)).assignedTo)).toBe(owner.id);
-    const gone = await User.findById(member.id);
+    const project = await prisma.project.findUnique({ where: { id: projectId }, include: { members: true } });
+    expect(project.members.map((m) => m.userId)).not.toContain(member.id);
+    expect((await prisma.task.findUnique({ where: { id: task } })).assignedToId).toBe(owner.id);
+    const gone = (await member.a.get("/me")).body;
     expect(gone.involvedProjects).toHaveLength(0);
     expect(gone.allTasks).toHaveLength(0);
     const feed = (await owner.a.get(`/get-project-activity-by-id/${projectId}`)).body.items;
@@ -208,13 +197,13 @@ describe("removing someone cleans up their work", () => {
     const task = (await member.a.post(`/add-new-task-by-project-id/${theirs}`).send({ taskTitle: "Mine", assignedTo: member.id })).body.taskId;
 
     await owner.a.delete(`/workspaces/${wsId}/members/${member.id}`).expect(200);
-    const project = await Project.findById(theirs);
-    expect(String(project.projectManager)).toBe(owner.id);
-    expect(project.projectMembers.map(String)).not.toContain(member.id);
-    expect(String((await Task.findById(task)).assignedTo)).toBe(owner.id);
-    const newManager = await User.findById(owner.id);
-    expect(newManager.myProjects.map(String)).toContain(theirs);
-    expect((await User.findById(member.id)).myProjects).toHaveLength(0);
+    const project = await prisma.project.findUnique({ where: { id: theirs }, include: { members: true } });
+    expect(project.projectManagerId).toBe(owner.id);
+    expect(project.members.map((m) => m.userId)).not.toContain(member.id);
+    expect((await prisma.task.findUnique({ where: { id: task } })).assignedToId).toBe(owner.id);
+    const newManager = (await owner.a.get("/me")).body;
+    expect(newManager.myProjects.map((p) => p._id)).toContain(theirs);
+    expect((await member.a.get("/me")).body.myProjects).toHaveLength(0);
     // and the new manager can actually manage it
     await owner.a.put(`/edit-project-by-id/${theirs}`).send({ projectName: "Now ours", projectStatus: "In Progress" }).expect(200);
     await admin.a.get("/me").expect(200);
@@ -228,7 +217,7 @@ describe("removing someone cleans up their work", () => {
     const otherProject = (await owner.a.post(`/create-new-project-for-user-id/${owner.id}`).send({ projectName: "Elsewhere", workspaceId: otherWs })).body.project._id;
     await owner.a.post(`/add-new-member-by-project-id/${otherProject}`).send({ memberId: member.id }).expect(200);
     await owner.a.delete(`/workspaces/${wsId}/members/${member.id}`).expect(200);
-    expect((await Project.findById(otherProject)).projectMembers.map(String)).toContain(member.id);
+    expect((await prisma.projectMember.findMany({ where: { projectId: otherProject } })).map((m) => m.userId)).toContain(member.id);
   });
 });
 
@@ -270,7 +259,7 @@ describe("workspaces and projects", () => {
     const { owner, member, wsId } = await team();
     await owner.a.delete(`/delete-user/${owner.id}`).expect(409);
     await member.a.delete(`/delete-user/${member.id}`).expect(200);
-    expect((await Workspace.findById(wsId)).members.map((m) => String(m.user))).not.toContain(member.id);
+    expect((await prisma.workspaceMember.findMany({ where: { workspaceId: wsId } })).map((m) => m.userId)).not.toContain(member.id);
   });
 });
 
@@ -284,9 +273,9 @@ describe("invitations: creating and managing", () => {
 
     const token = tokenOf(res.body.link);
     expect(token.length).toBeGreaterThanOrEqual(40);
-    const stored = await Invite.findOne({ email: "new.person@example.com" });
-    expect(stored.tokenHash).toBe(Invite.hashToken(token));
-    expect(JSON.stringify(stored.toObject())).not.toContain(token); // the secret itself is not in the database
+    const stored = await prisma.invite.findFirst({ where: { email: "new.person@example.com" } });
+    expect(stored.tokenHash).toBe(hashToken(token));
+    expect(JSON.stringify(stored)).not.toContain(token); // the secret itself is not in the database
 
     const listed = (await owner.a.get(`/workspaces/${wsId}/invites`).expect(200)).body;
     expect(listed).toHaveLength(1);
@@ -363,7 +352,7 @@ describe("invitations: creating and managing", () => {
   test("expired invitations disappear from the pending list", async () => {
     const { owner, wsId } = await team();
     const created = (await invite(owner, wsId, { email: "old@example.com" })).body;
-    await Invite.updateOne({ _id: created.invite._id }, { expiresAt: new Date(Date.now() - 1000) });
+    await prisma.invite.update({ where: { id: created.invite._id }, data: { expiresAt: new Date(Date.now() - 1000) } });
     expect((await owner.a.get(`/workspaces/${wsId}/invites`)).body).toEqual([]);
     expect((await request(app).get(`/invites/preview/${tokenOf(created.link)}`)).body.status).toBe("expired");
   });
@@ -385,7 +374,7 @@ describe("invitations: the person invited", () => {
     const res = await outsider.a.post("/invites/accept").send({ token: tokenOf(link) }).expect(200);
     expect(res.body.workspace).toEqual({ _id: wsId, name: "Acme" });
     expect((await outsider.a.get(`/workspaces/${wsId}`)).body.myRole).toBe("admin");
-    expect((await Invite.findById(inv._id)).acceptedBy.toString()).toBe(outsider.id);
+    expect((await prisma.invite.findUnique({ where: { id: inv._id } })).acceptedById).toBe(outsider.id);
     expect(await inboxTypes(owner)).toContain("workspace.joined");
     expect((await request(app).get(`/invites/preview/${tokenOf(link)}`)).body.status).toBe("accepted");
   });
@@ -401,7 +390,7 @@ describe("invitations: the person invited", () => {
     const wrong = await stranger.a.post("/invites/accept").send({ token }).expect(403);
     expect(wrong.body.error).toMatch(/different email/i);
     await stranger.a.get(`/workspaces/${wsId}`).expect(404); // and it did not let them in
-    expect((await Invite.findOne({ email: outsider.email })).acceptedAt).toBeUndefined();
+    expect((await prisma.invite.findFirst({ where: { email: outsider.email } })).acceptedAt).toBeNull();
     await outsider.a.post("/invites/accept").send({ token }).expect(200); // the right person still can
   });
 
@@ -412,7 +401,7 @@ describe("invitations: the person invited", () => {
     await outsider.a.post("/invites/accept").send({ token: tokenOf(revoked.link) }).expect(410);
 
     const expired = (await invite(owner, wsId, { email: outsider.email })).body;
-    await Invite.updateOne({ _id: expired.invite._id }, { expiresAt: new Date(Date.now() - 1000) });
+    await prisma.invite.update({ where: { id: expired.invite._id }, data: { expiresAt: new Date(Date.now() - 1000) } });
     await outsider.a.post("/invites/accept").send({ token: tokenOf(expired.link) }).expect(410);
     await outsider.a.get(`/workspaces/${wsId}`).expect(404);
   });
@@ -432,17 +421,15 @@ describe("invitations: the person invited", () => {
     const results = await Promise.all([1, 2, 3].map(() => outsider.a.post("/invites/accept").send({ token })));
     for (const r of results) expect([200, 410]).toContain(r.status);
     expect(results.some((r) => r.status === 200)).toBe(true);
-    const ws = await Workspace.findById(wsId);
-    expect(ws.members.filter((m) => String(m.user) === outsider.id)).toHaveLength(1);
+    expect(await prisma.workspaceMember.count({ where: { workspaceId: wsId, userId: outsider.id } })).toBe(1);
     await outsider.a.post("/invites/accept").send({ token }).expect(200); // idempotent once they are in
   });
 
   test("existing members can still use an old link without error", async () => {
     const { owner, member, wsId } = await team();
-    const stale = new Invite({
-      workspace: wsId, email: member.email, role: "admin", tokenHash: Invite.hashToken("z".repeat(43)), invitedBy: owner.id, expiresAt: new Date(Date.now() + 1e6),
+    await prisma.invite.create({
+      data: { workspaceId: wsId, email: member.email, role: "admin", tokenHash: hashToken("z".repeat(43)), invitedById: owner.id, expiresAt: new Date(Date.now() + 1e6) },
     });
-    await stale.save();
     await member.a.post("/invites/accept").send({ token: "z".repeat(43) }).expect(200);
     expect((await member.a.get(`/workspaces/${wsId}`)).body.myRole).toBe("member"); // did not escalate to admin
   });
@@ -481,7 +468,7 @@ describe("invitations in the app (verified addresses only)", () => {
     const other = await signup(11, { verified: true });
     const second = (await invite(owner, wsId, { email: other.email })).body.invite;
     await other.a.post(`/invites/${second._id}/decline`).expect(200);
-    expect((await Invite.findById(second._id)).revokedAt).toBeDefined();
+    expect((await prisma.invite.findUnique({ where: { id: second._id } })).revokedAt).not.toBeNull();
     await other.a.post(`/invites/${second._id}/accept`).expect(410);
     expect((await owner.a.get(`/workspaces/${wsId}/invites`)).body).toEqual([]);
   });
@@ -493,7 +480,7 @@ describe("invitations in the app (verified addresses only)", () => {
     expect((await snoop.a.get("/invites/mine")).body).toEqual([]);
     await snoop.a.post(`/invites/${inv._id}/accept`).expect(403);
     await snoop.a.post(`/invites/${inv._id}/decline`).expect(403);
-    expect((await Invite.findById(inv._id)).revokedAt).toBeUndefined();
+    expect((await prisma.invite.findUnique({ where: { id: inv._id } })).revokedAt).toBeNull();
     await snoop.a.post("/invites/aaaaaaaaaaaaaaaaaaaaaaaa/accept").expect(404);
     await snoop.a.post("/invites/nope/accept").expect(400);
   });
@@ -520,15 +507,16 @@ describe("migrating projects created before workspaces existed", () => {
     const summary = await migrateLegacyProjects();
     expect(summary).toEqual({ workspacesCreated: 2, projectsMigrated: 3, membersAdded: 2 });
 
-    const bossWs = await Workspace.findOne({ owner: boss.id });
+    const bossWs = await prisma.workspace.findFirst({ where: { ownerId: boss.id }, include: { members: true } });
     expect(bossWs.name).toBe("First1's workspace");
-    expect(bossWs.members.map((m) => [String(m.user), m.role]).sort()).toEqual([[boss.id, "owner"], [a.id, "member"], [b.id, "member"]].sort());
-    for (const id of [p1, p2]) expect(String((await Project.findById(id)).workspace)).toBe(String(bossWs._id));
-    const aWs = await Workspace.findOne({ owner: a.id });
-    expect(String((await Project.findById(p3)).workspace)).toBe(String(aWs._id));
+    expect(bossWs.members.map((m) => [m.userId, m.role]).sort()).toEqual([[boss.id, "owner"], [a.id, "member"], [b.id, "member"]].sort());
+    const wsOf = async (id) => (await prisma.project.findUnique({ where: { id } })).workspaceId;
+    for (const id of [p1, p2]) expect(await wsOf(id)).toBe(bossWs.id);
+    const aWs = await prisma.workspace.findFirst({ where: { ownerId: a.id } });
+    expect(await wsOf(p3)).toBe(aWs.id);
 
     // the people can now use the workspace features
-    expect((await b.a.get(`/workspaces/${bossWs._id}`).expect(200)).body.myRole).toBe("member");
+    expect((await b.a.get(`/workspaces/${bossWs.id}`).expect(200)).body.myRole).toBe("member");
   });
 
   test("is safe to run again: nothing is duplicated and migrated projects are left alone", async () => {
@@ -537,21 +525,21 @@ describe("migrating projects created before workspaces existed", () => {
     await migrateLegacyProjects();
     const again = await migrateLegacyProjects();
     expect(again).toEqual({ workspacesCreated: 0, projectsMigrated: 0, membersAdded: 0 });
-    expect(await Workspace.countDocuments()).toBe(1);
+    expect(await prisma.workspace.count()).toBe(1);
   });
 
   test("a later legacy project joins the existing migrated workspace, and projects already in a workspace are untouched", async () => {
     const { boss, a, mk } = await legacy();
     await mk(boss, "Old", [a]);
     await migrateLegacyProjects();
-    const wsId = (await Workspace.findOne({ owner: boss.id }))._id;
+    const wsId = (await prisma.workspace.findFirst({ where: { ownerId: boss.id } })).id;
     const another = await makeWorkspace(boss, "Hand made");
     const inOther = (await boss.a.post(`/create-new-project-for-user-id/${boss.id}`).send({ projectName: "Kept", workspaceId: another })).body.project._id;
     const late = await mk(boss, "Late", []);
     const summary = await migrateLegacyProjects();
     expect(summary).toEqual({ workspacesCreated: 0, projectsMigrated: 1, membersAdded: 0 });
-    expect(String((await Project.findById(late)).workspace)).toBe(String(wsId));
-    expect(String((await Project.findById(inOther)).workspace)).toBe(String(another)); // not moved
+    expect((await prisma.project.findUnique({ where: { id: late } })).workspaceId).toBe(wsId);
+    expect((await prisma.project.findUnique({ where: { id: inOther } })).workspaceId).toBe(another); // not moved
   });
 
   test("with nothing to migrate it does nothing", async () => {

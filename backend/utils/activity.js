@@ -1,7 +1,4 @@
-const Activity = require("../model/activity");
-const User = require("../model/user");
-const Project = require("../model/project");
-const Notification = require("../model/notification");
+const { prisma } = require("../db/prisma");
 const { isTest } = require("../config/env");
 
 const CATEGORY = {
@@ -34,24 +31,22 @@ const recipientsExcluding = (actorId, ids = []) =>
  */
 async function logActivity(actorId, projectId, verb, { task, data = {}, notify = [] } = {}) {
   try {
-    const actor = await User.findById(actorId).select("firstName lastName").lean();
+    const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { firstName: true, lastName: true } });
     const actorName = fullName(actor);
-    await Activity.create({
-      project: projectId,
-      actor: actorId,
-      actorName,
-      verb,
-      category: CATEGORY[verb],
-      task,
-      data,
+    await prisma.activity.create({
+      data: { projectId, actorId, actorName, verb, category: CATEGORY[verb], taskId: task ? String(task) : null, data },
     });
 
     const recipients = recipientsExcluding(actorId, notify);
     if (recipients.length) {
-      const project = await Project.findById(projectId).select("projectName").lean();
-      await Notification.insertMany(
-        recipients.map((user) => ({ user, type: verb, actorName, project: projectId, projectName: project?.projectName, task, data }))
-      );
+      const project = await prisma.project.findUnique({ where: { id: projectId }, select: { projectName: true } });
+      // A recipient whose account is gone meanwhile would violate the foreign key: only notify real users.
+      const existing = await prisma.user.findMany({ where: { id: { in: recipients } }, select: { id: true } });
+      await prisma.notification.createMany({
+        data: existing.map(({ id }) => ({
+          userId: id, type: verb, actorName, projectId, projectName: project?.projectName, taskId: task ? String(task) : null, data,
+        })),
+      });
     }
   } catch (err) {
     if (!isTest) console.error(`Could not record activity "${verb}":`, err.message);

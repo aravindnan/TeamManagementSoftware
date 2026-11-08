@@ -1,17 +1,14 @@
-const Project = require("../model/project");
-const Task = require("../model/task");
+const { getProject, getTask } = require("../db/queries");
 const { notFound, forbidden } = require("./AppError");
-
-// Fields of another user that are safe to show to teammates (never password / DOB / token data).
-const PUBLIC_USER_FIELDS = "firstName lastName username email role bio profilePictureURL";
 
 const idEq = (a, b) => String(a && a._id ? a._id : a) === String(b && b._id ? b._id : b);
 const isManager = (project, userId) => idEq(project.projectManager, userId);
 const isMember = (project, userId) =>
   isManager(project, userId) || (project.projectMembers || []).some((m) => idEq(m, userId));
 
-const loadProject = async (projectId, query = Project.findById(projectId)) => {
-  const project = await query;
+/** Loads a project in API shape (relations as id lists), or throws 404. */
+const loadProject = async (projectId) => {
+  const project = await getProject(projectId);
   if (!project) throw notFound("Project not found");
   return project;
 };
@@ -25,12 +22,12 @@ const requireManager = (project, userId) => {
 
 // Loads a task plus its project's membership and checks the caller belongs to the project.
 const loadTaskForMember = async (taskId, userId) => {
-  const task = await Task.findById(taskId);
+  const task = await getTask(taskId);
   if (!task) throw notFound("Task not found");
-  const project = await Project.findById(task.project).select("projectManager projectMembers");
+  const project = await getProject(task.project);
   if (!project) throw notFound("Project not found");
   requireMember(project, userId);
   return { task, project };
 };
 
-module.exports = { PUBLIC_USER_FIELDS, idEq, isManager, isMember, loadProject, requireMember, requireManager, loadTaskForMember };
+module.exports = { idEq, isManager, isMember, loadProject, requireMember, requireManager, loadTaskForMember };

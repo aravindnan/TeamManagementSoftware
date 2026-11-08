@@ -1,9 +1,4 @@
-const mongoose = require("mongoose");
-const { mongoUri } = require("./env");
-
-mongoose.set("strictQuery", true);
-
-const connectToDatabase = (uri = mongoUri) => mongoose.connect(uri);
-const disconnectFromDatabase = () => mongoose.disconnect();
+// Kept as the single import point for server.js and tests; the client itself lives in db/prisma.js.
+const { connectToDatabase, disconnectFromDatabase } = require("../db/prisma");
 
 module.exports = { connectToDatabase, disconnectFromDatabase };

@@ -1,6 +1,4 @@
-const Project = require("../model/project");
-const Workspace = require("../model/workspace");
-const User = require("../model/user");
+const { prisma } = require("../db/prisma");
 
 /**
  * Brings projects created before workspaces existed into the new model. For each project manager with such projects,
@@ -11,38 +9,49 @@ const User = require("../model/user");
  * workspace is reused instead of duplicated.
  */
 async function migrateLegacyProjects() {
-  const legacy = await Project.find({ workspace: { $in: [null, undefined] } }).select("projectManager projectMembers");
+  const legacy = await prisma.project.findMany({
+    where: { workspaceId: null },
+    select: { id: true, projectManagerId: true, members: { select: { userId: true } } },
+    orderBy: { id: "asc" },
+  });
   const byManager = new Map();
   for (const project of legacy) {
-    const key = String(project.projectManager);
-    if (!byManager.has(key)) byManager.set(key, []);
-    byManager.get(key).push(project);
+    if (!byManager.has(project.projectManagerId)) byManager.set(project.projectManagerId, []);
+    byManager.get(project.projectManagerId).push(project);
   }
 
   const summary = { workspacesCreated: 0, projectsMigrated: 0, membersAdded: 0 };
   for (const [managerId, projects] of byManager) {
-    const manager = await User.findById(managerId).select("firstName").lean();
-    if (!manager) continue; // orphaned project: leave it alone rather than guess
+    // One transaction per manager: either their workspace is fully set up and linked, or nothing changed.
+    await prisma.$transaction(async (tx) => {
+      const manager = await tx.user.findUnique({ where: { id: managerId }, select: { firstName: true } });
+      if (!manager) return; // cannot happen with foreign keys, but never guess
 
-    const name = `${manager.firstName}'s workspace`.slice(0, 60);
-    let workspace = await Workspace.findOne({ owner: managerId, name });
-    if (!workspace) {
-      workspace = await Workspace.create({ name, owner: managerId, members: [{ user: managerId, role: "owner" }] });
-      summary.workspacesCreated += 1;
-    }
-
-    const known = new Set(workspace.members.map((m) => String(m.user)));
-    for (const project of projects) {
-      for (const memberId of project.projectMembers.map(String)) {
-        if (known.has(memberId) || !(await User.exists({ _id: memberId }))) continue;
-        workspace.members.push({ user: memberId, role: "member" });
-        known.add(memberId);
-        summary.membersAdded += 1;
+      const name = `${manager.firstName}'s workspace`.slice(0, 60);
+      let workspace = await tx.workspace.findFirst({ where: { ownerId: managerId, name }, include: { members: true } });
+      if (!workspace) {
+        workspace = await tx.workspace.create({
+          data: { name, ownerId: managerId, members: { create: [{ userId: managerId, role: "owner" }] } },
+          include: { members: true },
+        });
+        summary.workspacesCreated += 1;
       }
-    }
-    await workspace.save();
-    await Project.updateMany({ _id: { $in: projects.map((p) => p._id) } }, { workspace: workspace._id });
-    summary.projectsMigrated += projects.length;
+
+      const known = new Set(workspace.members.map((m) => m.userId));
+      const toAdd = [];
+      for (const project of projects) {
+        for (const { userId } of project.members) {
+          if (known.has(userId)) continue;
+          known.add(userId);
+          toAdd.push({ workspaceId: workspace.id, userId, role: "member" });
+        }
+      }
+      if (toAdd.length) await tx.workspaceMember.createMany({ data: toAdd });
+      summary.membersAdded += toAdd.length;
+
+      await tx.project.updateMany({ where: { id: { in: projects.map((p) => p.id) } }, data: { workspaceId: workspace.id } });
+      summary.projectsMigrated += projects.length;
+    });
   }
   return summary;
 }

@@ -1,5 +1,5 @@
 const { SignJWT, jwtVerify } = require("jose");
-const User = require("../model/user");
+const { prisma } = require("../db/prisma");
 const config = require("../config/env");
 const { unauthorized } = require("../utils/AppError");
 const asyncHandler = require("../utils/asyncHandler");
@@ -17,7 +17,7 @@ const secretKey = new TextEncoder().encode(config.jwtSecret);
 const signToken = (user) =>
   new SignJWT({ tv: user.tokenVersion || 0 })
     .setProtectedHeader({ alg: "HS256" })
-    .setSubject(String(user._id))
+    .setSubject(String(user.id))
     .setIssuedAt()
     .setExpirationTime(`${config.jwtExpiresInSeconds}s`)
     .sign(secretKey);
@@ -49,14 +49,14 @@ const requireAuth = asyncHandler(async (req, res, next) => {
     throw unauthorized("Invalid or expired session");
   }
 
-  const user = await User.findById(payload.sub).select("tokenVersion").lean();
+  const user = await prisma.user.findUnique({ where: { id: String(payload.sub) }, select: { id: true, tokenVersion: true } });
   if (!user || (user.tokenVersion || 0) !== (payload.tv || 0)) throw unauthorized("Invalid or expired session");
 
-  req.user = { id: String(user._id) };
+  req.user = { id: user.id };
 
   const secondsLeft = payload.exp - Math.floor(Date.now() / 1000);
   if (secondsLeft < config.jwtExpiresInSeconds / 4 && req.cookies?.[config.cookieName]) {
-    await setAuthCookie(res, { _id: user._id, tokenVersion: user.tokenVersion });
+    await setAuthCookie(res, { id: user.id, tokenVersion: user.tokenVersion });
   }
   next();
 });

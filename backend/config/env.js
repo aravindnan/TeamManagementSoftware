@@ -21,7 +21,8 @@ module.exports = {
   isProd,
   isTest,
   port: Number(process.env.PORT) || 8000,
-  mongoUri: isTest ? process.env.MONGO_URI : buildMongoUri(),
+  // PostgreSQL connection string. Tests prefer TEST_DATABASE_URL so a developer database is never wiped by accident.
+  databaseUrl: isTest ? process.env.TEST_DATABASE_URL || process.env.DATABASE_URL : required("DATABASE_URL"),
   jwtSecret,
   jwtExpiresInSeconds: 8 * 60 * 60, // sessions slide: see middleware/auth.js
   cookieName: "tms_token",
@@ -43,12 +44,3 @@ module.exports = {
     folder: process.env.CLOUDINARY_FOLDER || "tms",
   },
 };
-
-function buildMongoUri() {
-  if (process.env.MONGO_URI) return process.env.MONGO_URI;
-  const user = required("DB_USERNAME");
-  const pass = required("DB_PASSWORD");
-  const name = required("DB_NAME");
-  const host = process.env.DB_HOST || "cluster0.myusfay.mongodb.net";
-  return `mongodb+srv://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}/${name}?retryWrites=true&w=majority`;
-}

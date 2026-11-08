@@ -1,12 +1,11 @@
 process.env.GOOGLE_CLIENT_ID = "test-client.apps.googleusercontent.com";
 
 const request = require("supertest");
-const mongoose = require("mongoose");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { prisma, assertTestDatabase, resetDatabase } = require("./helpers/db");
 const { generateKeyPair, exportJWK, SignJWT, createLocalJWKSet } = require("jose");
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-let mongod, app, User, verifier, verifyGoogleIdToken, AppError;
+let app, verifier, verifyGoogleIdToken, AppError;
 let keys, otherKeys, jwks;
 
 async function makeKeys(kid) {
@@ -36,23 +35,17 @@ beforeAll(async () => {
   otherKeys = await makeKeys("good-key"); // same key id, different material: an attacker's key
   jwks = createLocalJWKSet({ keys: [keys.jwk] });
 
-  mongod = await MongoMemoryServer.create();
-  process.env.MONGO_URI = mongod.getUri();
+  assertTestDatabase();
   const { connectToDatabase } = require("../config/database");
-  await connectToDatabase(process.env.MONGO_URI);
+  await connectToDatabase();
   ({ verifyGoogleIdToken, verifier } = require("../utils/googleVerifier"));
   ({ AppError } = require("../utils/AppError"));
-  User = require("../model/user");
   app = require("../app").createApp();
 });
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongod.stop();
+  await prisma.$disconnect();
 });
-beforeEach(async () => {
-  await mongoose.connection.db.dropDatabase();
-  await Promise.all(Object.values(mongoose.models).map((m) => m.syncIndexes()));
-});
+beforeEach(resetDatabase);
 afterEach(() => jest.restoreAllMocks());
 
 describe("verifyGoogleIdToken (real signature checks with locally generated keys)", () => {
@@ -129,7 +122,7 @@ describe("POST /auth/google", () => {
   const profile = (o = {}) => ({ googleId: "g-1", email: "ann.lee@example.com", firstName: "Ann", lastName: "Lee", picture: "", ...o });
   const asGoogle = (p) => jest.spyOn(verifier, "verify").mockResolvedValue(p);
   const signIn = (credential = "x".repeat(40)) => request(app).post("/auth/google").send({ credential });
-  const dbUser = (q) => User.findOne(q).select("+password +googleId +tokenVersion");
+  const dbUser = (q) => prisma.user.findFirst({ where: q });
 
   test("creates a verified account, signs in, and never exposes secrets", async () => {
     asGoogle(profile());
@@ -162,7 +155,7 @@ describe("POST /auth/google", () => {
     const second = (await signIn()).body;
     expect(second.isNewUser).toBe(false);
     expect(second.userId).toBe(first.userId);
-    expect(await User.countDocuments()).toBe(1);
+    expect(await prisma.user.count()).toBe(1);
   });
 
   test("two people with the same email local part get different usernames", async () => {
@@ -170,7 +163,7 @@ describe("POST /auth/google", () => {
     await signIn();
     asGoogle(profile({ googleId: "g-b", email: "sam@b.example" }));
     await signIn();
-    const names = (await User.find()).map((u) => u.username);
+    const names = (await prisma.user.findMany()).map((u) => u.username);
     expect(new Set(names).size).toBe(2);
     expect(names).toContain("sam");
   });
@@ -178,7 +171,7 @@ describe("POST /auth/google", () => {
   test("odd email local parts still give a valid username", async () => {
     asGoogle(profile({ googleId: "g-x", email: "+++@weird.example" }));
     await signIn();
-    expect((await User.findOne({ googleId: "g-x" }).select("+googleId")).username).toMatch(/^[a-z0-9_.-]{3,}$/);
+    expect((await prisma.user.findFirst({ where: { googleId: "g-x" } })).username).toMatch(/^[a-z0-9_.-]{3,}$/);
   });
 
   test("links an existing UNVERIFIED password account, but locks out whoever set that password", async () => {
@@ -206,14 +199,14 @@ describe("POST /auth/google", () => {
     const real = jest.requireActual("../utils/googleVerifier").verifyGoogleIdToken;
     jest.spyOn(verifier, "verify").mockImplementation((c) => real(c, { clientId: CLIENT_ID, jwks }));
     await signIn("this-is-not-a-real-google-token-at-all").expect(401);
-    expect(await User.countDocuments()).toBe(0);
+    expect(await prisma.user.count()).toBe(0);
   });
 
   test("an unverified Google email is refused", async () => {
     jest.spyOn(verifier, "verify").mockRejectedValue(new AppError(401, "Your Google email address is not verified"));
     const res = await signIn().expect(401);
     expect(res.body.error).toMatch(/not verified/i);
-    expect(await User.countDocuments()).toBe(0);
+    expect(await prisma.user.count()).toBe(0);
   });
 
   test("a missing or absurd credential is a 400", async () => {
@@ -226,6 +219,6 @@ describe("POST /auth/google", () => {
     await request(app).post("/register").send({
       username: "pwuser", email: "pw@example.com", password: "Passw0rd!x", firstName: "P", lastName: "W", role: "Dev", dateOfBirth: "1990-01-01",
     }).expect(201);
-    expect((await User.findOne({ username: "pwuser" })).emailVerified).toBe(false);
+    expect((await prisma.user.findFirst({ where: { username: "pwuser" } })).emailVerified).toBe(false);
   });
 });

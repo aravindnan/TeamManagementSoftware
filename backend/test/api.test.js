@@ -1,12 +1,13 @@
 const request = require("supertest");
-const mongoose = require("mongoose");
-const { MongoMemoryServer } = require("mongodb-memory-server");
 
 process.env.CLOUDINARY_CLOUDNAME = "demo-cloud";
 process.env.CLOUDINARY_APIKEY = "123456";
 process.env.CLOUDINARY_API_SECRET = "shhh-test-secret";
 
-let mongod, app;
+// Required after the variables above: the config module reads them once, when first loaded.
+const { prisma, assertTestDatabase, resetDatabase } = require("./helpers/db");
+
+let app;
 const agent = () => request.agent(app);
 
 const user = (n) => ({
@@ -22,14 +23,13 @@ async function signup(n) {
 }
 
 beforeAll(async () => {
-  mongod = await MongoMemoryServer.create();
-  process.env.MONGO_URI = mongod.getUri();
+  assertTestDatabase();
   const { connectToDatabase } = require("../config/database");
-  await connectToDatabase(process.env.MONGO_URI);
+  await connectToDatabase();
   app = require("../app").createApp();
 });
-afterAll(async () => { await mongoose.disconnect(); await mongod.stop(); });
-beforeEach(async () => { await mongoose.connection.db.dropDatabase(); await Promise.all(Object.values(mongoose.models).map((m) => m.syncIndexes())); });
+afterAll(async () => { await prisma.$disconnect(); });
+beforeEach(resetDatabase);
 
 describe("auth", () => {
   test("everything except register/login/logout requires auth", async () => {
@@ -169,12 +169,12 @@ describe("projects & tasks", () => {
     expect(res.body.tasks[0].taskId).toBe(overdue.body.taskId);
     expect(res.body.tasks[0].reasons[0]).toMatch(/^Overdue by/);
 
-    const Task = mongoose.model("Task");
-    expect((await Task.findById(overdue.body.taskId)).completedAt).toBeUndefined();
+    const completedAt = async () => (await prisma.task.findUnique({ where: { id: overdue.body.taskId } })).completedAt;
+    expect(await completedAt()).toBeNull();
     await t.a.put(`/change-task-status-by-id/${overdue.body.taskId}`).send({ newStatus: "Completed" }).expect(200);
-    expect((await Task.findById(overdue.body.taskId)).completedAt).toBeInstanceOf(Date);
+    expect(await completedAt()).toBeInstanceOf(Date);
     await t.a.put(`/change-task-status-by-id/${overdue.body.taskId}`).send({ newStatus: "In Progress" }).expect(200);
-    expect((await Task.findById(overdue.body.taskId)).completedAt).toBeUndefined();
+    expect(await completedAt()).toBeNull();
     const after = await t.a.get(`/get-project-risk-by-id/${projectId}`).expect(200);
     expect(after.body.summary.openTasks).toBe(2);
   });
@@ -240,8 +240,8 @@ describe("projects & tasks", () => {
     await m.a.post(`/add-new-task-by-project-id/${projectId}`).send(taskBody(t.id));
     await m.a.post(`/add-comment-to-project-by-id/${projectId}`).send({ messageContent: "bye" });
     await m.a.delete(`/delete-project-by-id/${projectId}`).expect(200);
-    expect(await mongoose.model("Task").countDocuments()).toBe(0);
-    expect(await mongoose.model("Comment").countDocuments()).toBe(0);
+    expect(await prisma.task.count()).toBe(0);
+    expect(await prisma.comment.count()).toBe(0);
     const tm = await t.a.get("/me");
     expect(tm.body.allTasks).toHaveLength(0);
     expect(tm.body.involvedProjects).toHaveLength(0);
@@ -324,7 +324,7 @@ describe("task drawer API", () => {
   test("status can be changed through PATCH, with completedAt and history kept in step", async () => {
     const { t, projectId, taskId } = await scene();
     await patch(t, taskId, { taskStatus: "Completed" }).expect(200);
-    expect((await mongoose.model("Task").findById(taskId)).completedAt).toBeInstanceOf(Date);
+    expect((await prisma.task.findUnique({ where: { id: taskId } })).completedAt).toBeInstanceOf(Date);
     expect((await feed(t, projectId))[0]).toMatchObject({ verb: "task.status_changed", data: { from: "To Do", to: "Completed" } });
   });
 
@@ -529,8 +529,7 @@ describe("activity feed", () => {
 
   test("a failure to record activity never breaks the action", async () => {
     const { t, projectId, taskId } = await scene();
-    const Activity = mongoose.model("Activity");
-    const spy = jest.spyOn(Activity, "create").mockRejectedValueOnce(new Error("db hiccup"));
+    const spy = jest.spyOn(prisma.activity, "create").mockRejectedValueOnce(new Error("db hiccup"));
     await t.a.put(`/change-task-status-by-id/${taskId}`).send({ newStatus: "Completed" }).expect(200);
     spy.mockRestore();
     expect((await t.a.get(`/get-task-by-id/${taskId}`)).body.taskStatus).toBe("Completed");
@@ -538,9 +537,9 @@ describe("activity feed", () => {
 
   test("deleting a project deletes its feed", async () => {
     const { m, projectId } = await scene();
-    expect(await mongoose.model("Activity").countDocuments({ project: projectId })).toBeGreaterThan(0);
+    expect(await prisma.activity.count({ where: { projectId } })).toBeGreaterThan(0);
     await m.a.delete(`/delete-project-by-id/${projectId}`).expect(200);
-    expect(await mongoose.model("Activity").countDocuments({ project: projectId })).toBe(0);
+    expect(await prisma.activity.count({ where: { projectId } })).toBe(0);
   });
 });
 
