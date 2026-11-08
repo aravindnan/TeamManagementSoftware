@@ -15,10 +15,17 @@ The implementation is still a student prototype. In priority order, the main pro
 1. **The API has no authentication at all.** A `verifyToken` middleware exists but no route uses it, and the frontend never sends a token. Anyone who can reach the API can read every user, including password hashes, and can edit or delete any project. They can also call `DELETE /delete-all-users`, `/delete-all-projects` and `/delete-all-tasks`.
 2. **Secrets are committed to a GitHub remote.** This includes the MongoDB credentials (`backend/.env`), the JWT signing key (hard-coded in 3 files), the Cloudinary API secret (`frontend/src/env/environment.ts`, which also ships in the browser bundle), and plaintext demo passwords (`documentation/dummy.txt`). **Rotate all of them now**, whether or not the repo is public.
 3. **Several endpoints are broken or crash.** These include the members, tasks-by-project and performance endpoints, the completed/pending task endpoints, and `delete_all_data`. Some handlers send a response twice.
-4. **The data model is relational, but it is stored as duplicated arrays in Mongo.** `User.allTasks`, `myProjects`, `involvedProjects` and `Project.allTasks` must be kept in sync by hand, and they already drift.
+4. **The data model is relational, but it was stored as duplicated arrays in Mongo (now fixed: Postgres + Prisma).** `User.allTasks`, `myProjects`, `involvedProjects` and `Project.allTasks` must be kept in sync by hand, and they already drift.
 5. **The frontend has no data layer.** Pages re-fetch on a `rerender` boolean toggle. There are 289 `any` types, 154 `console.log` calls, no route guards, no accessibility attributes, and two copy-pasted comment and media implementations.
 
 **Recommendation:** Spend about a week on a **stabilise & secure** pass. Then **re-platform** onto a typed, tested foundation: TypeScript on both ends, Postgres + Prisma, cookie-based auth with RBAC, TanStack Query and real-time updates. After that, build a small number of **signature features**: activity-log-driven AI standups, deadline-risk prediction, capacity-aware assignment, and GitHub PR linking. These give the project a story that stands out on a resume.
+
+---
+
+## Progress notes
+
+- **Database moved to PostgreSQL + Prisma (done).** Addresses problem 4 (duplicated back-reference arrays) and the M1 "Postgres + Prisma schema and a migration script from Mongo" item. The backend (`backend/`) now stores everything in Postgres through Prisma: real foreign keys, `ProjectMember` / `WorkspaceMember` join tables, indexes on the hot paths (tasks by project and by assignee + status, activity and notifications by recipient, unique invite `tokenHash`, nullable-unique `googleId`, unique email and username), and Prisma transactions around the multi-step writes (member removal, ownership transfer, invite accept). Ids keep the ObjectId hex format and the API keeps its `_id` / document-style shapes through one serializer layer (`backend/db/serialize.js`), so the frontend did not change. Tests run against a real Postgres (CI service container). `npm run migrate:mongo-to-postgres` imports the old data (idempotent, dry-run, tested against fixtures; **not yet run against production data**). Docker Compose gained a Postgres service and the API image applies migrations on start. Not done: a TypeScript service layer, and Postgres full-text search / `pgvector` (now possible).
+- **Manual step still owned by the project owner:** rotating the secrets listed in problem 2 (the old MongoDB credentials in particular, once the cut-over is complete and Mongo can be shut down).
 
 ---
 
@@ -53,7 +60,7 @@ design/, documentation/, research papers/   academic artefacts (drawio, PDFs, Fi
 | HTTP | axios, with no instance, interceptors or auth header | |
 | Dates | `moment` **and** `dayjs` | Duplicate libraries; moment is in maintenance mode |
 | Backend | Express 4, Mongoose 8, bcryptjs, jsonwebtoken, multer (unused) | `backend/package.json` also lists `react-redux`, `@reduxjs/toolkit` and `axios`, which are unused |
-| DB | MongoDB Atlas | |
+| DB | MongoDB Atlas (now PostgreSQL + Prisma, see Progress notes) | |
 | Files | Cloudinary, uploaded directly from the browser with an unsigned preset | |
 | Tests | CRA's default `App.test.tsx`, which fails (it looks for "learn react") | No backend tests |
 | Deploy | None: no Docker, CI, env per stage or build config | |

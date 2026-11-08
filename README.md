@@ -3,7 +3,7 @@
 Collaborative task management: projects, members, tasks with priorities and due dates, discussions and file attachments.
 
 - **Frontend:** React 18 + TypeScript (CRA), Tailwind, MUI icons, Redux Toolkit
-- **Backend:** Node + Express 4, MongoDB (Mongoose), zod validation, `jose` JWT
+- **Backend:** Node + Express 4, PostgreSQL + Prisma, zod validation, `jose` JWT
 - **Auth:** httpOnly cookie session (`tms_token`), server-side revocation on logout, rate-limited login
 
 ## Features
@@ -29,12 +29,34 @@ Server data is cached with TanStack Query (`frontend/src/queries/`):
 - The cache is cleared on login, logout and any 401, so one user's data can never reach the next.
 - Failed requests are retried only when a retry could help (network errors and 5xx, at most twice).
 
+## Database
+
+PostgreSQL via Prisma (`backend/prisma/schema.prisma`, migrations in `backend/prisma/migrations`). The old document model's duplicated back-reference arrays (`User.allTasks`, `myProjects`, `involvedProjects`, `Project.allTasks`) are gone: they are derived from real foreign keys, and membership lives in join tables (`ProjectMember`, `WorkspaceMember`). Ids keep the 24-hex ObjectId format and `_id` in the JSON, and `backend/db/serialize.js` renders rows in the same document-style shapes as before, so the frontend is unchanged. Change the schema with `cd backend && npx prisma migrate dev --name <what>` and commit the generated migration.
+
+### Moving existing MongoDB data
+
+One-off, read-only on Mongo, idempotent, all-or-nothing (one transaction):
+
+```bash
+cd backend
+# DATABASE_URL = the new Postgres (migrations applied: `npm run db:migrate`)
+# MONGO_URI    = the old MongoDB (or the legacy DB_USERNAME / DB_PASSWORD / DB_NAME / DB_HOST variables)
+npm run migrate:mongo-to-postgres -- --dry-run   # full run inside a transaction that is rolled back
+npm run migrate:mongo-to-postgres                # the real import; safe to re-run (existing rows are skipped)
+```
+
+Ids, password hashes, token versions and invite hashes are preserved, so existing logins, sessions and invitation links keep working. References to documents that no longer exist (the old database had no foreign keys) are dropped or nulled and listed as warnings. Once you have cut over you can delete the script and the `mongodb` dependency.
+
 ## Run locally
 
 ```bash
-# API  (needs a MongoDB URI; see backend/.env.example)
-cd backend && cp .env.example .env   # fill it in
-npm install && npm run dev           # http://localhost:8000
+# Database: any PostgreSQL 14+ (e.g. `docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=CHANGE_ME -e POSTGRES_DB=tms postgres:16-alpine`)
+
+# API  (see backend/.env.example; DATABASE_URL is required)
+cd backend && cp .env.example .env   # fill it in, e.g. DATABASE_URL=postgresql://postgres:CHANGE_ME@localhost:5432/tms
+npm install                          # also runs `prisma generate`
+npm run db:migrate                   # applies prisma/migrations to the database
+npm run dev                          # http://localhost:8000
 
 # Web
 cd frontend && cp .env.example .env
@@ -49,12 +71,14 @@ docker compose up --build
 # web: http://localhost:8080   api health: http://localhost:8000/healthz
 ```
 
-The compose stack runs MongoDB, the API (non-root, health-checked) and the frontend (nginx, SPA fallback, long-cache for hashed assets). It is served over plain HTTP, so it sets `COOKIE_SECURE=false`; remove that when you put it behind HTTPS.
+Also set `POSTGRES_PASSWORD` in `.env` (use URL-safe characters; the file shows a one-liner). The compose stack runs PostgreSQL (with a health check the API waits for), the API (applies pending migrations on start with `prisma migrate deploy`, then serves; non-root, health-checked) (non-root, health-checked) and the frontend (nginx, SPA fallback, long-cache for hashed assets). Data lives in the `postgres-data` volume. It is served over plain HTTP, so it sets `COOKIE_SECURE=false`; remove that when you put it behind HTTPS.
 
 ## Tests
 
 ```bash
-cd backend && npm test               # API integration tests (in-memory MongoDB, no real DB needed)
+# API integration tests run against a REAL PostgreSQL. Point TEST_DATABASE_URL at a throw-away database whose
+# name contains "test": it is migrated automatically and TRUNCATED before every test, so never use a real one.
+cd backend && TEST_DATABASE_URL=postgresql://postgres:CHANGE_ME@localhost:5432/tms_test npm test
 cd frontend && CI=true npm test -- --watchAll=false
 ```
 
@@ -67,6 +91,6 @@ cd frontend && CI=true npm test -- --watchAll=false
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every push to `main` and every pull request: backend tests (in-memory MongoDB), frontend type check, tests and a production build (with `CI=true`, so any lint warning fails the build), then builds both Docker images and validates the compose file. Dependabot proposes weekly dependency updates.
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request: backend tests (against a Postgres service container, plus a check that `prisma/migrations` matches `schema.prisma`), frontend type check, tests and a production build (with `CI=true`, so any lint warning fails the build), then builds both Docker images and validates the compose file. Dependabot proposes weekly dependency updates.
 
 See [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md) for the full audit and roadmap.
