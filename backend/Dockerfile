@@ -1,5 +1,5 @@
 # ---- dependencies (production only) ----
-FROM node:22-alpine AS deps
+FROM node:25-alpine AS deps
 # Prisma's query engine needs OpenSSL on Alpine.
 RUN apk add --no-cache openssl
 WORKDIR /app
@@ -9,7 +9,7 @@ COPY prisma ./prisma
 RUN npm ci --omit=dev
 
 # ---- runtime ----
-FROM node:22-alpine
+FROM node:25-alpine
 RUN apk add --no-cache openssl
 ENV NODE_ENV=production
 WORKDIR /app
