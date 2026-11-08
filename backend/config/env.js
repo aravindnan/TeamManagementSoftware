@@ -21,6 +21,7 @@ module.exports = {
   isProd,
   isTest,
   port: Number(process.env.PORT) || 8000,
+  trustProxyHops: Number(process.env.TRUST_PROXY_HOPS) || 1,
   // PostgreSQL connection string. Tests prefer TEST_DATABASE_URL so a developer database is never wiped by accident.
   databaseUrl: isTest ? process.env.TEST_DATABASE_URL || process.env.DATABASE_URL : required("DATABASE_URL"),
   jwtSecret,

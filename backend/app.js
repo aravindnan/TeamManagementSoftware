@@ -9,7 +9,7 @@ const { notFoundHandler, errorHandler } = require("./middleware/error");
 function createApp() {
   const app = express();
   app.disable("x-powered-by");
-  app.set("trust proxy", 1);
+  app.set("trust proxy", config.trustProxyHops); // proxies in front of the API (Render: 1; Vercel rewrite + Render: 2)
 
   app.use(helmet());
   app.use(

@@ -17,7 +17,6 @@ Collaborative task management: projects, members, tasks with priorities and due 
 - **Task drawer**: click any task on the project page (list, board, radar, insights, activity) to open it in a slide-over, deep-linkable as `?task=<id>`. Inline editing of title, status, priority, assignee (manager/creator only), due date and estimate; labels; a sub-task checklist with progress; a Markdown description (write/preview, rendered by a small parser that builds React elements and never injects HTML, so descriptions cannot run script); comments; and the task's own history. Edits use a partial `PATCH` so only changed fields are sent and recorded.
 - **Google sign-in and registration**: Google Identity Services on the login and register pages. The server verifies the ID token's signature against Google's keys, plus issuer, audience, expiry and `email_verified`. A Google account whose email matches an existing *unverified* password account links to it only after that account's password is cleared and its sessions revoked (pre-hijack defence). Set `GOOGLE_CLIENT_ID` (backend) and `REACT_APP_GOOGLE_CLIENT_ID` (frontend) to the same OAuth Web client ID; without them the button is hidden and the endpoint answers 503.
 - **Workspaces and invites**: workspaces with owner / admin / member roles (non-members get 404), a Workspaces panel in both nav bars, a workspace filter on the dashboard, and a workspace picker when creating a project. Invites are email-bound links (256-bit token stored hashed, 7-day expiry, single use, regenerable and revocable) opened at `/invite/:token`; people who already have an account also see an in-app invitations banner. There is no email delivery yet: copy the link and send it yourself. Project members must belong to the project's workspace.
-- **Existing projects**: projects created before workspaces keep working. To move them into workspaces run `cd backend && npm run migrate:workspaces` (one "<Name>'s workspace" per project manager, everyone on their projects added as members; safe to re-run).
 
 ## Frontend data layer
 
@@ -33,19 +32,9 @@ Server data is cached with TanStack Query (`frontend/src/queries/`):
 
 PostgreSQL via Prisma (`backend/prisma/schema.prisma`, migrations in `backend/prisma/migrations`). The old document model's duplicated back-reference arrays (`User.allTasks`, `myProjects`, `involvedProjects`, `Project.allTasks`) are gone: they are derived from real foreign keys, and membership lives in join tables (`ProjectMember`, `WorkspaceMember`). Ids keep the 24-hex ObjectId format and `_id` in the JSON, and `backend/db/serialize.js` renders rows in the same document-style shapes as before, so the frontend is unchanged. Change the schema with `cd backend && npx prisma migrate dev --name <what>` and commit the generated migration.
 
-### Moving existing MongoDB data
+## Deploy
 
-One-off, read-only on Mongo, idempotent, all-or-nothing (one transaction):
-
-```bash
-cd backend
-# DATABASE_URL = the new Postgres (migrations applied: `npm run db:migrate`)
-# MONGO_URI    = the old MongoDB (or the legacy DB_USERNAME / DB_PASSWORD / DB_NAME / DB_HOST variables)
-npm run migrate:mongo-to-postgres -- --dry-run   # full run inside a transaction that is rolled back
-npm run migrate:mongo-to-postgres                # the real import; safe to re-run (existing rows are skipped)
-```
-
-Ids, password hashes, token versions and invite hashes are preserved, so existing logins, sessions and invitation links keep working. References to documents that no longer exist (the old database had no foreign keys) are dropped or nulled and listed as warnings. Once you have cut over you can delete the script and the `mongodb` dependency.
+Neon (Postgres) + Render (API) + Vercel (web), deployed by GitHub Actions after CI passes, with every credential in GitHub Actions secrets. Setup steps: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Run locally
 

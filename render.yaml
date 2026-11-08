@@ -1,0 +1,35 @@
+# Render blueprint for the API. The database is Neon (external), so there is no database block here.
+# Secrets are NOT stored in this file: the deploy workflow (.github/workflows/deploy.yml) copies them
+# from GitHub Actions secrets into this service's environment on every deploy.
+services:
+  - type: web
+    name: tms-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /healthz
+    autoDeployTrigger: off # deploys are triggered by the GitHub workflow after CI passes
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY_HOPS
+        value: "2"
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLIENT_ORIGINS
+        sync: false
+      - key: PUBLIC_CLIENT_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: CLOUDINARY_CLOUDNAME
+        sync: false
+      - key: CLOUDINARY_APIKEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
